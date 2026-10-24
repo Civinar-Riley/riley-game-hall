@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>炸金花</title>
+<!--
+  音效：ZzFX v1.4.0 程序化合成引擎（MIT © 2019 Frank Force，https://github.com/KilledByAPixel/ZzFX），
+  无音频文件；发牌/看牌/下注/加注/弃牌/比牌/胜负音效参数本页手调，M 键或右上角 🔊 静音（localStorage 持久化）。
+-->
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overflow:hidden}
@@ -13,7 +17,7 @@ body{background:#0b3d2e;background:radial-gradient(ellipse at 50% 30%,#146b4f 0%
 #topbar{display:flex;justify-content:space-between;align-items:center;padding:4px 2px}
 #pot{background:rgba(0,0,0,.35);border:1px solid #d4a437;border-radius:20px;padding:5px 14px;font-size:15px;font-weight:700;color:var(--t-accent)}
 #roundinfo{font-size:12px;color:#9fd8b8}
-#helpbtn{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;width:28px;height:28px;border-radius:50%;font-size:15px}
+#helpbtn,#sndbtn{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;width:28px;height:28px;border-radius:50%;font-size:15px}
 /* 牌桌：上/左/右 + 中央 */
 #table{display:grid;grid-template-columns:1fr 1.35fr 1fr;grid-template-rows:auto 1fr;grid-template-areas:". top ." "left center right";gap:6px;align-items:center;flex:1;min-height:0;margin:4px 0}
 #seat-top{grid-area:top;width:100%;max-width:170px;margin:0 auto}
@@ -96,7 +100,7 @@ body{background:#0b3d2e;background:radial-gradient(ellipse at 50% 30%,#146b4f 0%
   <div id="topbar">
     <div id="pot">底池 0</div>
     <div id="roundinfo"></div>
-    <button id="helpbtn">?</button>
+    <button id="sndbtn" aria-label="音效开关">🔊</button><button id="helpbtn">?</button>
   </div>
   <div id="table">
     <div class="tseat" id="seat-top"></div>
@@ -132,6 +136,159 @@ const ANTE=10, BET_LEVELS=[10,20,50,100], START_CHIPS=1000, MAX_ORBIT=8;
 const SUIT_TXT=['♠','♥','♣','♦'], RANK_TXT={14:'A',13:'K',12:'Q',11:'J',10:'10',9:'9',8:'8',7:'7',6:'6',5:'5',4:'4',3:'3',2:'2'};
 const TYPE_NAME=['','单张','对子','顺子','同花','同花顺','豹子'];
 const $=id=>document.getElementById(id);
+
+/* ============ 音效（ZzFX 程序化合成，无音频文件） ============ */
+var ZZFX = {
+  volume: .3,
+  sampleRate: 44100,
+  audioContext: null,
+  ac: function () {
+    if (!this.audioContext) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      this.audioContext = new AC();
+    }
+    if (this.audioContext.state === 'suspended') this.audioContext.resume();
+    return this.audioContext;
+  },
+  play: function (...parameters) { return this.playSamples([this.buildSamples(...parameters)]); },
+  playSamples: function (sampleChannels, volumeScale = 1, rate = 1, pan = 0, loop = false) {
+    const channelCount = sampleChannels.length;
+    const sampleLength = sampleChannels[0].length;
+    const buffer = this.ac().createBuffer(channelCount, sampleLength, this.sampleRate);
+    const source = this.ac().createBufferSource();
+    sampleChannels.forEach((c, i) => buffer.getChannelData(i).set(c));
+    source.buffer = buffer;
+    source.playbackRate.value = rate;
+    source.loop = loop;
+    const gainNode = this.ac().createGain();
+    gainNode.gain.value = this.volume * volumeScale;
+    gainNode.connect(this.ac().destination);
+    source.gainNode = gainNode;
+    const pannerNode = new StereoPannerNode(this.ac(), { 'pan': pan });
+    source.connect(pannerNode).connect(gainNode);
+    source.start();
+    return source;
+  },
+  buildSamples: function (
+    volume = 1,
+    randomness = .05,
+    frequency = 220,
+    attack = 0,
+    sustain = 0,
+    release = .1,
+    shape = 0,
+    shapeCurve = 1,
+    slide = 0,
+    deltaSlide = 0,
+    pitchJump = 0,
+    pitchJumpTime = 0,
+    repeatTime = 0,
+    noise = 0,
+    modulation = 0,
+    bitCrush = 0,
+    delay = 0,
+    sustainVolume = 1,
+    decay = 0,
+    tremolo = 0,
+    filter = 0
+  ) {
+    let sampleRate = this.sampleRate,
+      PI2 = Math.PI * 2,
+      abs = Math.abs,
+      sign = v => v < 0 ? -1 : 1,
+      startSlide = slide *= 500 * PI2 / sampleRate / sampleRate,
+      startFrequency = frequency *=
+        (1 + randomness * 2 * Math.random() - randomness) * PI2 / sampleRate,
+      modOffset = 0,
+      repeat = 0,
+      crush = 0,
+      jump = 1,
+      length,
+      b,
+      t = 0,
+      i = 0,
+      s = 0,
+      f,
+      quality = 2, w = PI2 * abs(filter) * 2 / sampleRate,
+      cos = Math.cos(w), alpha = Math.sin(w) / 2 / quality,
+      a0 = 1 + alpha, a1 = -2 * cos / a0, a2 = (1 - alpha) / a0,
+      b0 = (1 + sign(filter) * cos) / 2 / a0,
+      b1 = -(sign(filter) + cos) / a0, b2 = b0,
+      x2 = 0, x1 = 0, y2 = 0, y1 = 0;
+    const minAttack = 9;
+    attack = attack * sampleRate || minAttack;
+    decay *= sampleRate;
+    sustain *= sampleRate;
+    release *= sampleRate;
+    delay *= sampleRate;
+    deltaSlide *= 500 * PI2 / sampleRate ** 3;
+    modulation *= PI2 / sampleRate;
+    pitchJump *= PI2 / sampleRate;
+    pitchJumpTime *= sampleRate;
+    repeatTime = repeatTime * sampleRate | 0;
+    length = attack + decay + sustain + release + delay | 0;
+    b = new Float32Array(length > 0 ? length : 0);
+    for (; i < length; b[i++] = s * volume) {
+      if (!(++crush % (bitCrush * 100 | 0))) {
+        s = shape ? shape > 1 ? shape > 2 ? shape > 3 ? shape > 4 ?
+          (t / PI2 % 1 < shapeCurve / 2 ? 1 : -1) :
+          Math.sin(t ** 3) :
+          Math.max(Math.min(Math.tan(t), 1), -1) :
+          1 - (2 * t / PI2 % 2 + 2) % 2 :
+          1 - 4 * abs(Math.round(t / PI2) - t / PI2) :
+          Math.sin(t);
+        s = (repeatTime ?
+          1 - tremolo + tremolo * Math.sin(PI2 * i / repeatTime)
+          : 1) *
+          (shape > 4 ? s : sign(s) * abs(s) ** shapeCurve) *
+          (i < attack ? i / attack :
+            i < attack + decay ?
+              1 - ((i - attack) / decay) * (1 - sustainVolume) :
+              i < attack + decay + sustain ?
+                sustainVolume :
+                i < length - delay ?
+                  (length - i - delay) / release *
+                  sustainVolume :
+                  0);
+        s = delay ? s / 2 + (delay > i ? 0 :
+          (i < length - delay ? 1 : (length - i) / delay) *
+          b[i - delay | 0] / 2 / volume) : s;
+        if (filter)
+          s = y1 = b2 * x2 + b1 * (x2 = x1) + b0 * (x1 = s) - a2 * y2 - a1 * (y2 = y1);
+      }
+      f = (frequency += slide += deltaSlide) *
+        Math.cos(modulation * modOffset++);
+      t += f + f * noise * (i * i * PI2 % 2 - 1);
+      if (jump && ++jump > pitchJumpTime) {
+        frequency += pitchJump;
+        startFrequency += pitchJump;
+        jump = 0;
+      }
+      if (repeatTime && !(++repeat % repeatTime)) {
+        frequency = startFrequency;
+        slide = startSlide;
+        jump ||= 1;
+      }
+    }
+    return b;
+  }
+};;
+var ZS={
+  deal:   [0.55,0.03,900,0,0.01,0.05,4,0,0,0,0,0,0,0.5,0,0,0,0.5,0,0,-900],
+  look:   [0.5,0,660,0,0.02,0.06,1,0,25,0,0,0,0,0,0,0,0,0.7,0,0,0],
+  chip:   [0.55,0,1046,0,0.012,0.045,5,0.3,0,0,0,0,0,0,0,0,0,1,0,0,0],
+  raise:  [0.65,0,1318,0,0.012,0.06,5,0.3,0,0,0,0,0,0,0,0,0.06,1,0,0,0],
+  fold:   [0.5,0,150,0,0.03,0.12,2,0,-22,0,0,0,0,0,0,0,0,0.5,0,0,0],
+  compare:[0.85,0,210,0,0.05,0.22,4,0,0,0,0,0,0,1.2,0,0,0,0.4,0.1,0,0],
+  win:    [0.9,0,523,0,0.05,0.18,1,0,0,0,523,0.09,0,0,0,0,0.12,0.7,0,0,0],
+  lose:   [0.7,0,330,0,0.10,0.40,2,0,-40,0,0,0,0,0,0,0,0,0.5,0.2,0,0]
+};
+var SFX={
+  enabled:(function(){try{return localStorage.getItem('zjh_sound')!=='off';}catch(e){return true;}})(),
+  last:null,
+  play:function(n){this.last=n;if(!this.enabled)return;try{ZZFX.play(...ZS[n]);}catch(e){}},
+  toggle:function(){this.enabled=!this.enabled;try{localStorage.setItem('zjh_sound',this.enabled?'on':'off');}catch(e){}return this.enabled;}
+};
 
 function newDeck(){
   const d=[];
@@ -223,6 +380,7 @@ function newRound(){
   S.dealer=(S.dealer+1)%4;
   S.turnIdx=S.dealer;
   log('新一局，底注 '+ANTE);
+  SFX.play('deal');
   advance();
 }
 function nextIdx(){
@@ -263,8 +421,8 @@ function uBet(kind){ // 'call' 'raise' 'fold' 'look'
   const p=S.players[0];
   // 只在自己回合、且自己还能行动时才接受操作（否则残留按钮会跨回合下注/弃牌）
   if(S.turnIdx!==0||!canAct(p))return;
-  if(kind==='look'){p.looked=true;log('你看了牌：'+handStr(p.hand)+'（'+typeStr(p.hand)+'）');renderButtons();render();return;}
-  if(kind==='fold'){p.folded=true;log('你弃牌了');afterAct(p);return;}
+  if(kind==='look'){p.looked=true;log('你看了牌：'+handStr(p.hand)+'（'+typeStr(p.hand)+'）');SFX.play('look');renderButtons();render();return;}
+  if(kind==='fold'){p.folded=true;log('你弃牌了');SFX.play('fold');afterAct(p);return;}
   if(kind==='raise'){
     const i=BET_LEVELS.indexOf(S.curBet);
     if(i>=BET_LEVELS.length-1){log('已是最大注');return;}
@@ -275,6 +433,7 @@ function uBet(kind){ // 'call' 'raise' 'fold' 'look'
   p.chips-=pay;p.paid+=pay;p.invested+=pay;S.pot+=pay;
   if(p.chips<=0)p.allIn=true;
   log(kind==='raise'?('你加注到 '+S.curBet+(p.looked?'（明×2）':'')):('你跟注 '+pay));
+  SFX.play(kind==='raise'?'raise':'chip');
   afterAct(p);
 }
 function afterAct(p){
@@ -306,6 +465,7 @@ function doCompare(a,b){
     ?(winner.isUser?('🎉 比牌获胜！'+loser.name+'('+typeStr(loser.hand)+')被淘汰'):('😢 比牌输了，对方是'+typeStr(winner.hand)+' '+handStr(winner.hand)))
     :(winner.name+' 比牌赢了 '+loser.name);
   log(msg);
+  SFX.play('compare');
   if(a.isUser||b.isUser)showComparePanel(a,b,winner);
   render();
   const seq=S.seq;
@@ -348,13 +508,16 @@ function aiAct(p){
     p.chips-=pay;p.paid+=pay;p.invested+=pay;S.pot+=pay;if(p.chips<=0)p.allIn=true;
     const bluffing=s<.38;
     log(p.name+(bluffing?' 凶狠加注到 ':' 加注到 ')+S.curBet+(p.looked?'（明×2）':''));
+    SFX.play('raise');
   }else if(act==='call'){
     const pay=Math.min(tc,p.chips);
     p.chips-=pay;p.paid+=pay;p.invested+=pay;S.pot+=pay;if(p.chips<=0)p.allIn=true;
     log(p.name+' 跟注 '+pay+(p.looked?'（明牌）':'（闷牌）'));
+    SFX.play('chip');
   }else{
     p.folded=true;
     log(p.name+' 弃牌了');
+    SFX.play('fold');
   }
   p.acted=true;
   render();
@@ -411,6 +574,7 @@ function endRound(winner,reason){
   }
   html+='</div><div class="big">你的筹码：'+S.players[0].chips+'</div>';
   const broke=S.players[0].chips<ANTE;
+  SFX.play(winners.some(p=>p.isUser)?'win':'lose');
   html+='<button class="btn primary" id="nextbtn">'+(broke?'领 1000 继续':'下一局')+'</button>';
   showPanel(html);
   $('nextbtn').onclick=()=>{
@@ -513,6 +677,10 @@ function init(){
   S.players[0].chips=myChips;
   if(myChips<ANTE){myChips=START_CHIPS;S.players[0].chips=START_CHIPS;saveChips();}
   $('helpbtn').onclick=showHelp;
+  function syncSndBtn(){$('sndbtn').textContent=SFX.enabled?'🔊':'🔇';}
+  $('sndbtn').onclick=()=>{SFX.toggle();syncSndBtn();};
+  syncSndBtn();
+  document.addEventListener('keydown',e=>{if(e.key==='m'||e.key==='M'){SFX.toggle();syncSndBtn();}});
   S.orbitStarter=0;
   newRound();
 }
