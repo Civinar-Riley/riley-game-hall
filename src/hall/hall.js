@@ -15,6 +15,7 @@ const ACCENTS = {
     'minesweeper.html': '#8b9cf0',  // 紫蓝（保留原风格）
     'match-pairs.html': '#2fd6a3',  // 薄荷绿（保留原风格）
     'hextris.html': '#5aa9ff',      // 雾蓝（原 #2c3e50 系）
+    'blockrain.html': '#39c5cf',    // 青（方块主色之一）
 };
 
 /* 游戏清单：加游戏 = public/games/ 里丢一个单文件 html + 在这里加一行 */
@@ -25,6 +26,7 @@ const GAMES = [
     { file: 'match-pairs.html',  icon: '🀄', name: '连连看',         desc: '连连看消消乐：把相同的牌全部配对消除' },
     { file: 'zhajinhua.html',    icon: '🃏', name: '炸金花',         desc: '经典炸金花：3 张牌比大小，3 个 AI 陪你唬人' },
     { file: 'hextris.html',      icon: '⬡', name: '六边形消消乐',   desc: 'Hextris 开源移植：旋转六边形接住落块，三连同色消除' },
+    { file: 'blockrain.html',    icon: '🧱', name: '俄罗斯方块',     desc: 'Blockrain 开源移植：经典七种方块消行得分，普通/友好/刁钻三种 AI 难度' },
 ];
 
 const $ = (s, root) => (root || document).querySelector(s);
@@ -70,7 +72,9 @@ window.addEventListener('message', e => {
 function withShim(html, file) {
     const shim = shimSource(file, JSON.stringify(readSave(file)));
     const accent = ACCENTS[file] || '#f5c542';
-    const theme = `<style>:root{--t-accent:${accent};}${themeCss}</style>`;
+    /* accent 必须写在 themeCss 之后：两者同为 :root 选择器，后者才能覆盖
+     * game-theme.css 里的默认 --t-accent（否则所有游戏都被默认金色吞掉） */
+    const theme = `<style>${themeCss}:root{--t-accent:${accent};}</style>`;
     let out = /<head[^>]*>/i.test(html)
         ? html.replace(/<head[^>]*>/i, m => m + shim + theme)
         : shim + theme + html;

@@ -1,5 +1,6 @@
 node_modules/
 .DS_Store
 *.local
+gui-test-screenshots/
 
 # dist/ 不进忽略：构建产物随源码一起保留在仓库里，每次改完源码都要重新构建并提交

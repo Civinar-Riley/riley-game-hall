@@ -8,7 +8,7 @@
 [![Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen?style=flat-square)](package.json)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](https://www.gnu.org/licenses/gpl-3.0)
 
-**多游戏合集 —— 一个大厅，6 款游戏随便选**
+**多游戏合集 —— 一个大厅，7 款游戏随便选**
 
 ### [▶️ 进入游戏厅](https://civinar-riley.github.io/riley-game-hall/)
 
@@ -26,6 +26,7 @@
 | 🀄 连连看 | 把相同的牌全部配对消除 |
 | 🃏 炸金花 | 3 张牌比大小，3 个 AI 陪你玩（还会唬人） |
 | ⬡ 六边形消消乐 | Hextris 开源移植：旋转六边形接住落块，三连同色消除（已汉化） |
+| 🧱 俄罗斯方块 | Blockrain 开源移植：经典七种方块消行得分，普通/友好/刁钻三种 AI 难度（已汉化） |
 
 ## 📸 实机截图
 
@@ -71,4 +72,4 @@ npm run build    # 构建，产物在 dist/
 
 本仓库以 **GPL-3.0** 协议开源（见 [LICENSE](LICENSE)）：可以自由使用、修改、分发，但修改后再发布也必须以同样的 GPL-3.0 开源。
 
-其中「六边形消消乐」改编自 [Hextris](https://github.com/Hextris/hextris)（原作者 Logan Engstrom 等四人，同样 GPL-3.0），协议文本与改动说明见 [`public/games/hextris-LICENSE.md`](public/games/hextris-LICENSE.md)。
+其中「六边形消消乐」改编自 [Hextris](https://github.com/Hextris/hextris)（原作者 Logan Engstrom 等四人，同样 GPL-3.0），协议文本与改动说明见 [`public/games/hextris-LICENSE.md`](public/games/hextris-LICENSE.md)。「俄罗斯方块」改编自 [Aerolab/blockrain.js](https://github.com/Aerolab/blockrain.js)（MIT 协议），协议文本与改动说明见 [`public/games/blockrain-LICENSE.md`](public/games/blockrain-LICENSE.md)。
