@@ -7,6 +7,9 @@
   汉化与增强：UI 文案经插件 options 配置为中文（未改插件逻辑）；
   最高分/难度选择走 localStorage（大厅沙箱垫片自动持久化）；
   P 键/按钮暂停（窗口失焦自动暂停）、触屏设备启用虚拟按键、失败即结束的原始判定保持原样。
+  音效：ZzFX v1.4.0 核心引擎（MIT © Frank Force，https://github.com/KilledByAPixel/ZzFX）
+  程序化合成，无音频文件；落定/消行/游戏结束/开始四种音效参数为本页手调，
+  M 键或面板按钮可静音（localStorage 持久化）。
 -->
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -178,12 +181,13 @@ h1 .en {
       <div class="card btns">
         <button id="btnPause" type="button">⏸ 暂停</button>
         <button id="btnRestart" type="button">↻ 重开</button>
+        <button id="btnSound" type="button" aria-label="音效开关">🔊</button>
       </div>
       <div class="card help">
         <b>操作</b>
         ← → 移动 · ↑ / X 旋转<br>
         ↓ / S 加速 · Z 反向旋转<br>
-        P 暂停 / 继续<br>
+        P 暂停 / 继续 · M 音效<br>
         <span class="dim">友好 / 刁钻：由 AI 挑选对你<br>有利或不利的方块</span>
       </div>
     </aside>
@@ -1816,6 +1820,178 @@ h1 .en {
 (function () {
   'use strict';
 
+  /* ============================================================
+   * ZzFX v1.4.0 核心引擎（MIT License © 2019 Frank Force）
+   * https://github.com/KilledByAPixel/ZzFX —— 程序化音效合成，无音频文件
+   * 相对上游仅两处适配：去掉 ES module 导出与未使用的 ZZFXSound/getNote；
+   * AudioContext 改为首次使用时创建并 resume（原版脚本加载即 new，
+   * 会被浏览器自动播放策略挂起）。波形生成算法 buildSamples 未改动。
+   * ============================================================ */
+  var ZZFX = {
+    volume: .3,
+    sampleRate: 44100,
+    audioContext: null,
+    ac: function () {
+      if (!this.audioContext) {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        this.audioContext = new AC();
+      }
+      if (this.audioContext.state === 'suspended') this.audioContext.resume();
+      return this.audioContext;
+    },
+    play: function (...parameters) { return this.playSamples([this.buildSamples(...parameters)]); },
+    playSamples: function (sampleChannels, volumeScale = 1, rate = 1, pan = 0, loop = false) {
+      const channelCount = sampleChannels.length;
+      const sampleLength = sampleChannels[0].length;
+      const buffer = this.ac().createBuffer(channelCount, sampleLength, this.sampleRate);
+      const source = this.ac().createBufferSource();
+      sampleChannels.forEach((c, i) => buffer.getChannelData(i).set(c));
+      source.buffer = buffer;
+      source.playbackRate.value = rate;
+      source.loop = loop;
+      const gainNode = this.ac().createGain();
+      gainNode.gain.value = this.volume * volumeScale;
+      gainNode.connect(this.ac().destination);
+      source.gainNode = gainNode;
+      const pannerNode = new StereoPannerNode(this.ac(), { 'pan': pan });
+      source.connect(pannerNode).connect(gainNode);
+      source.start();
+      return source;
+    },
+    buildSamples: function (
+      volume = 1,
+      randomness = .05,
+      frequency = 220,
+      attack = 0,
+      sustain = 0,
+      release = .1,
+      shape = 0,
+      shapeCurve = 1,
+      slide = 0,
+      deltaSlide = 0,
+      pitchJump = 0,
+      pitchJumpTime = 0,
+      repeatTime = 0,
+      noise = 0,
+      modulation = 0,
+      bitCrush = 0,
+      delay = 0,
+      sustainVolume = 1,
+      decay = 0,
+      tremolo = 0,
+      filter = 0
+    ) {
+      let sampleRate = this.sampleRate,
+        PI2 = Math.PI * 2,
+        abs = Math.abs,
+        sign = v => v < 0 ? -1 : 1,
+        startSlide = slide *= 500 * PI2 / sampleRate / sampleRate,
+        startFrequency = frequency *=
+          (1 + randomness * 2 * Math.random() - randomness) * PI2 / sampleRate,
+        modOffset = 0,
+        repeat = 0,
+        crush = 0,
+        jump = 1,
+        length,
+        b,
+        t = 0,
+        i = 0,
+        s = 0,
+        f,
+        quality = 2, w = PI2 * abs(filter) * 2 / sampleRate,
+        cos = Math.cos(w), alpha = Math.sin(w) / 2 / quality,
+        a0 = 1 + alpha, a1 = -2 * cos / a0, a2 = (1 - alpha) / a0,
+        b0 = (1 + sign(filter) * cos) / 2 / a0,
+        b1 = -(sign(filter) + cos) / a0, b2 = b0,
+        x2 = 0, x1 = 0, y2 = 0, y1 = 0;
+      const minAttack = 9;
+      attack = attack * sampleRate || minAttack;
+      decay *= sampleRate;
+      sustain *= sampleRate;
+      release *= sampleRate;
+      delay *= sampleRate;
+      deltaSlide *= 500 * PI2 / sampleRate ** 3;
+      modulation *= PI2 / sampleRate;
+      pitchJump *= PI2 / sampleRate;
+      pitchJumpTime *= sampleRate;
+      repeatTime = repeatTime * sampleRate | 0;
+      length = attack + decay + sustain + release + delay | 0;
+      b = new Float32Array(length > 0 ? length : 0);
+      for (; i < length; b[i++] = s * volume) {
+        if (!(++crush % (bitCrush * 100 | 0))) {
+          s = shape ? shape > 1 ? shape > 2 ? shape > 3 ? shape > 4 ?
+            (t / PI2 % 1 < shapeCurve / 2 ? 1 : -1) :
+            Math.sin(t ** 3) :
+            Math.max(Math.min(Math.tan(t), 1), -1) :
+            1 - (2 * t / PI2 % 2 + 2) % 2 :
+            1 - 4 * abs(Math.round(t / PI2) - t / PI2) :
+            Math.sin(t);
+          s = (repeatTime ?
+            1 - tremolo + tremolo * Math.sin(PI2 * i / repeatTime)
+            : 1) *
+            (shape > 4 ? s : sign(s) * abs(s) ** shapeCurve) *
+            (i < attack ? i / attack :
+              i < attack + decay ?
+                1 - ((i - attack) / decay) * (1 - sustainVolume) :
+                i < attack + decay + sustain ?
+                  sustainVolume :
+                  i < length - delay ?
+                    (length - i - delay) / release *
+                    sustainVolume :
+                    0);
+          s = delay ? s / 2 + (delay > i ? 0 :
+            (i < length - delay ? 1 : (length - i) / delay) *
+            b[i - delay | 0] / 2 / volume) : s;
+          if (filter)
+            s = y1 = b2 * x2 + b1 * (x2 = x1) + b0 * (x1 = s) - a2 * y2 - a1 * (y2 = y1);
+        }
+        f = (frequency += slide += deltaSlide) *
+          Math.cos(modulation * modOffset++);
+        t += f + f * noise * (i * i * PI2 % 2 - 1);
+        if (jump && ++jump > pitchJumpTime) {
+          frequency += pitchJump;
+          startFrequency += pitchJump;
+          jump = 0;
+        }
+        if (repeatTime && !(++repeat % repeatTime)) {
+          frequency = startFrequency;
+          slide = startSlide;
+          jump ||= 1;
+        }
+      }
+      return b;
+    }
+  };
+
+  /* 音效参数（20 项：音量/随机/频率/起音/持续/释放/波形/整形/滑动/…），
+   * 波形 0=正弦 1=三角 5=方波 2=锯齿。手调，够用即可。 */
+  var ZS = {
+    place:  [0.45, 0.05, 85, 0, 0.03, 0.09, 1, 0, -35, 0, 0, 0, 0, 0.4, 0, 0, 0, 0.7, 0, 0, 0],
+    line1:  [0.7, 0, 415, 0, 0.05, 0.14, 1, 0, 0, 0, 420, 0.07, 0, 0, 0, 0, 0, 0.7, 0, 0, 0],
+    line2:  [0.8, 0, 494, 0, 0.05, 0.16, 1, 0, 0, 0, 494, 0.07, 0, 0, 0, 0, 0.10, 0.7, 0, 0, 0],
+    line3:  [0.85, 0, 554, 0, 0.05, 0.18, 5, 0.5, 0, 0, 554, 0.07, 0, 0, 0, 0, 0.14, 0.7, 0, 0, 0],
+    tetris: [0.95, 0, 622, 0, 0.06, 0.20, 5, 0.5, 0, 0, 622, 0.08, 0, 0, 0, 0, 0.18, 0.75, 0, 0, 0],
+    over:   [0.8, 0, 320, 0, 0.15, 0.50, 2, 0, -55, -25, 0, 0, 0, 0, 0, 0, 0, 0.5, 0.25, 0, 0],
+    start:  [0.7, 0, 392, 0, 0.04, 0.10, 1, 0, 0, 0, 392, 0.06, 0, 0, 0, 0, 0, 0.7, 0, 0, 0]
+  };
+
+  var SFX = {
+    enabled: (function () {
+      try { return localStorage.getItem('blockrain_sound') !== 'off'; } catch (e) { return true; }
+    })(),
+    last: null,
+    play: function (name) {
+      this.last = name;
+      if (!this.enabled) return;
+      try { ZZFX.play(...ZS[name]); } catch (e) { /* 无 AudioContext 环境：静默 */ }
+    },
+    toggle: function () {
+      this.enabled = !this.enabled;
+      try { localStorage.setItem('blockrain_sound', this.enabled ? 'on' : 'off'); } catch (e) {}
+      return this.enabled;
+    }
+  };
+
   var $board = $('#board');
   var HI_KEY = 'blockrain_hiscore', DIFF_KEY = 'blockrain_diff';
   var DIFFS = ['normal', 'nice', 'evil'];
@@ -1874,10 +2050,12 @@ h1 .en {
     gameOverText: '游戏结束',
     restartButtonText: '再来一局',
     scoreText: '得分',
+    onPlaced: function () { SFX.play('place'); },
     onStart: function () { newRound(); },
     onRestart: function () { newRound(); },
     onGameOver: function (score) {
       started = false; paused = false;
+      SFX.play('over');
       var isRecord = score > hi && score > 0;
       if (isRecord) {
         hi = score;
@@ -1894,12 +2072,14 @@ h1 .en {
     },
     onLine: function (n, inc, total) {
       lines += n;
+      SFX.play(n >= 4 ? 'tetris' : n === 3 ? 'line3' : n === 2 ? 'line2' : 'line1');
       syncStats(total);
     }
   });
 
   function newRound() {
     started = true; paused = false; lines = 0;
+    SFX.play('start');
     $('#pauseOverlay').removeClass('show');
     $('#btnPause').text('⏸ 暂停');
     syncStats(0);
@@ -1929,8 +2109,15 @@ h1 .en {
   $('#pauseOverlay').on('click', function () { setPaused(false); });
   $('#btnRestart').on('click', function () { setPaused(false); $board.blockrain('restart'); });
 
+  function syncSoundBtn() {
+    $('#btnSound').text(SFX.enabled ? '🔊' : '🔇');
+  }
+  $('#btnSound').on('click', function () { SFX.toggle(); syncSoundBtn(); });
+  syncSoundBtn();
+
   document.addEventListener('keydown', function (e) {
     if (e.key === 'p' || e.key === 'P') setPaused(!paused);
+    if (e.key === 'm' || e.key === 'M') { SFX.toggle(); syncSoundBtn(); }
   });
   /* 失焦/切页自动暂停，防止回来时方块已堆死 */
   window.addEventListener('blur', function () { if (started && !paused) setPaused(true); });
@@ -1944,6 +2131,9 @@ h1 .en {
   if (('ontouchstart' in window) || (navigator.maxTouchPoints > 0)) {
     $board.blockrain('touchControls', true);
   }
+
+  /* 调试/测试句柄（同 21 点暴露 window.__blackjack 的惯例） */
+  window.__blockrain = { SFX: SFX, ZZFX: ZZFX };
 })();
 </script>
 </body>
