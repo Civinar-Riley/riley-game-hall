@@ -11,8 +11,9 @@
   方块与连击线功能色保持原样；开始界面播放图标补回 FontAwesome 子集字体。
 -->
 <!DOCTYPE html>
-<html lang='en'>
+<html lang="zh-CN">
 <head>
+<meta charset="utf-8">
 <title>Hextris</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, minimal-ui"/>
 <meta name="description" content="An addictive puzzle game inspired by Tetris.">
@@ -38,7 +39,7 @@
 
 }
 #container {
-	color:#232323;
+	color:#f2f0e4;
 	position:absolute;
 	left:50%;
 	top:calc(50%);
@@ -385,7 +386,7 @@ button:focus {
 body {
 	color:#ecf0f1;
 	font-family:'Exo', sans-serif;
-	background-color:var(--t-bg);
+	background-color:var(--t-bg, #0c1411);
 }
 
 #clickToExit {
@@ -399,7 +400,7 @@ body {
 	right:0;
 	height:100%;
 	width:100%;
-	background-color:var(--t-bg);
+	background-color:var(--t-bg, #0c1411);
 	z-index:0;
 }
 #title {
@@ -939,22 +940,10 @@ function toggleClass(element, active) {
 
 function showText(text) {
 	var messages = {
-		'paused': "<div class='centeredHeader unselectable'>Game Paused</div>",
-		'pausedAndroid': "<div class='centeredHeader unselectable'>Game Paused</div><div class='unselectable centeredSubHeader' style='position:absolute;margin-left:-150px;left:50%;margin-top:20px;width:300px;font-size:16px;'><a href = 'https://play.google.com/store/apps/details?id=com.hextris.hextrisadfree' target='_blank'Want to support the developers? Don't like ads? Tap for Hextris ad-free!</a></div>",
-		'pausediOS': "<div class='centeredHeader unselectable'>Game Paused</div><div class='unselectable centeredSubHeader' style='position:absolute;margin-left:-150px;left:50%;margin-top:20px;width:300px;font-size:16px;'><a href = 'https://itunes.apple.com/us/app/hextris-ad-free/id912895524?mt=8' target='_blank'>Want to support the developers? Don't like ads? Tap for Hextris ad-free!</a></div>",
-		'pausedOther': "<div class='centeredHeader unselectable'>Game Paused</div><div class='unselectable centeredSubHeader' style='margin-top:10px;position:absolute;left:50%;margin-left:-190px;max-width:380px;font-size:18px;'><a href = 'http://hextris.github.io/' target='_blank'>Want to support the developers? Click here to buy one of the ad-free mobile versions!</a></div>",
+		'paused': "<div class='centeredHeader unselectable'>游戏已暂停</div><div class='unselectable centeredSubHeader' style='margin-top:10px;font-size:16px;'>按 P / 空格继续</div>",
 		'start': "<div class='centeredHeader unselectable' style='line-height:80px;'>Press enter to start</div>"
 	};
 
-	if (text == 'paused') {
-		if (settings.os == 'android') {
-			text = 'pausedAndroid'
-		} else if (settings.os == 'ios') {
-            text = 'pausediOS'
-        } else if (settings.platform == 'nonmobile') {
-            text = 'pausedOther'
-        }
-	}
 
 	if (text == 'gameover') {
 	   //Clay('client.share.any', {text: 'Think you can beat my score of '+ score + ' in Super Cool Game?'})
@@ -1983,7 +1972,7 @@ function update(dt) {
 
 	if (gameState == -1) {
 		ctx.globalAlpha = 0.9;
-		ctx.fillStyle = 'rgb(236,240,241)';
+		ctx.fillStyle = 'rgb(12,20,17)';
 		ctx.fillRect(0, 0, trueCanvas.width, trueCanvas.height);
 		ctx.globalAlpha = 1;
 	}
@@ -2401,7 +2390,7 @@ function init(b) {
 	$("#pauseBtn").attr('src',"data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiIHN0YW5kYWxvbmU9Im5vIj8+Cjxzdmcgd2lkdGg9Ijc1cHgiIGhlaWdodD0iNjVweCIgdmlld0JveD0iMCAwIDc1IDY1IiB2ZXJzaW9uPSIxLjEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHhtbG5zOnNrZXRjaD0iaHR0cDovL3d3dy5ib2hlbWlhbmNvZGluZy5jb20vc2tldGNoL25zIj4KCTwhLS0gR2VuZXJhdG9yOiBTa2V0Y2ggMy4yLjIgKDk5ODMpIC0gaHR0cDovL3d3dy5ib2hlbWlhbmNvZGluZy5jb20vc2tldGNoIC0tPgoJPHRpdGxlPlBhdXNlIGJ1dHRvbjwvdGl0bGU+Cgk8ZGVzYz5DcmVhdGVkIHdpdGggU2tldGNoLjwvZGVzYz4KCTxkZWZzPjwvZGVmcz4KCTxnIGlkPSJQYWdlLTEiIHN0cm9rZT0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIxIiBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiIHNrZXRjaDp0eXBlPSJNU1BhZ2UiPgoJCTxnIGlkPSJOZXctZ2FtZSIgc2tldGNoOnR5cGU9Ik1TQXJ0Ym9hcmRHcm91cCIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTI3NS4wMDAwMDAsIC01NjUuMDAwMDAwKSI+CgkJCTxnIGlkPSJQYXVzZS1idXR0b24iIHNrZXRjaDp0eXBlPSJNU0xheWVyR3JvdXAiIHRyYW5zZm9ybT0idHJhbnNsYXRlKDI3NS4wMDAwMDAsIDU2MC4wMDAwMDApIj4KCQkJCTxwb2x5Z29uIGlkPSJQYXVzZS1oZXgiIGZpbGw9IiNGRkZGRkYiIHNrZXRjaDp0eXBlPSJNU1NoYXBlR3JvdXAiIHRyYW5zZm9ybT0idHJhbnNsYXRlKDM3LjUwMDAwMCwgMzcuNTAwMDAwKSByb3RhdGUoLTkwLjAwMDAwMCkgdHJhbnNsYXRlKC0zNy41MDAwMDAsIC0zNy41MDAwMDApICIgcG9pbnRzPSIzNy41IDAgNjkuOTc1OTUyNiAxOC43NSA2OS45NzU5NTI2IDU2LjI1IDM3LjUgNzUgNS4wMjQwNDczNiA1Ni4yNSA1LjAyNDA0NzM2IDE4Ljc1ICI+PC9wb2x5Z29uPgoJCQkJPHBhdGggZD0iTTI2LDUyIEwzNCw1MiBMMzQsMjQgTDI2LDI0IEwyNiw1MiBMMjYsNTIgWiBNNDIsMjQgTDQyLDUyIEw1MCw1MiBMNTAsMjQgTDQyLDI0IEw0MiwyNCBaIiBpZD0iUGF1c2Utc2hhcGUiIGZpbGw9IiMyQzNFNTAiIHNrZXRjaDp0eXBlPSJNU1NoYXBlR3JvdXAiPjwvcGF0aD4KCQkJPC9nPgoJCTwvZz4KCTwvZz4KPC9zdmc+");
 	hideUIElements();
 	var saveState = localStorage.getItem("saveState") || "{}";
-	saveState = JSONfn.parse(saveState);
+	try { saveState = JSONfn.parse(saveState); } catch (e) { saveState = {}; }
 	document.getElementById("canvas").className = "";
 	history = {};
 	importedHistory = undefined;
@@ -2540,7 +2529,7 @@ function animLoop() {
 
 		if (checkGameOver() && !importing) {
 			var saveState = localStorage.getItem("saveState") || "{}";
-			saveState = JSONfn.parse(saveState);
+			try { saveState = JSONfn.parse(saveState); } catch (e) { saveState = {}; }
 			gameState = 2;
 
 			setTimeout(function() {
@@ -2624,8 +2613,7 @@ function isInfringing(hex) {
 function checkGameOver() {
 	for (var i = 0; i < MainHex.sides; i++) {
 		if (isInfringing(MainHex)) {
-			$.get('http://54.183.184.126/' + String(score))
-			if (highscores.indexOf(score) == -1) {
+						if (highscores.indexOf(score) == -1) {
 				highscores.push(score);
 			}
 			writeHighScores();

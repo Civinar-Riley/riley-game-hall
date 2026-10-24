@@ -1108,6 +1108,7 @@ const gameState = {
     elapsedTime: 0,
     longPressTimer: null,
     longPressTriggered: false,
+    lastLongPressTs: 0,
 };
 
 // 连环引爆错峰计时器（重开时清理，防止泄漏到新棋盘）
@@ -1195,6 +1196,7 @@ function setupEventListeners() {
         gameState.longPressTriggered = false;
         gameState.longPressTimer = setTimeout(() => {
             gameState.longPressTriggered = true;
+            gameState.lastLongPressTs = Date.now();
             toggleTileFlag(tile);
             // 震动反馈（如果设备支持）
             if (navigator.vibrate) navigator.vibrate(30);
@@ -1234,6 +1236,12 @@ function startGame() {
     // 清理未完成的连环引爆演出
     mineRevealTimers.forEach(clearTimeout);
     mineRevealTimers = [];
+
+    // 清理长按定时器/标志：残留的 400ms 回调会作用到新棋盘上，污染旗标计数
+    clearTimeout(gameState.longPressTimer);
+    gameState.longPressTimer = null;
+    gameState.longPressTriggered = false;
+    gameState.lastLongPressTs = 0;
 
     gameState.board = [];
     gameState.mineGrid = [];
@@ -1338,8 +1346,9 @@ function handleTileClick(tile, isRightClick) {
         return;
     }
 
-    // 长按已处理，跳过本次点击
-    if (gameState.longPressTriggered) {
+    // 长按已处理，跳过浏览器补发的这次点击
+    // 时间戳兜底：touchend / contextmenu 都会把标志清成 false，只靠布尔值挡不住补发的 click
+    if (gameState.longPressTriggered || Date.now() - gameState.lastLongPressTs < 600) {
         gameState.longPressTriggered = false;
         return;
     }
@@ -1357,7 +1366,8 @@ function handleTileClick(tile, isRightClick) {
     }
 
     const [cr, cc] = tile.id.split("-").map(Number);
-    if (gameState.mineGrid[cr][cc]) {
+    // 已插旗的格子不判负：长按插旗后浏览器可能补发 click，否则玩家无操作失误也会踩雷
+    if (!tile.classList.contains("tile-flagged") && gameState.mineGrid[cr][cc]) {
         gameOver(false);
         return;
     }
@@ -1464,6 +1474,10 @@ function countAdjacentMines(r, c) {
 function gameOver(victory) {
     gameState.gameOver = true;
     stopTimer();
+    // 计时器每秒才刷新一次，直接读快照会少报最多 1 秒
+    if (gameState.startTime) {
+        gameState.elapsedTime = Math.floor((Date.now() - gameState.startTime) / 1000);
+    }
 
     if (victory) {
         sfx.victory();
@@ -1473,7 +1487,10 @@ function gameOver(victory) {
         sfx.explosion();
         revealAllMines();
         finalTimeElement.textContent = gameState.elapsedTime;
-        gameOverModal.classList.add("active");
+        // 等地雷逐个引爆演完（30ms × 雷数）再弹结算窗，否则全屏遮罩会把演出挡在后面
+        mineRevealTimers.push(setTimeout(() => {
+            if (gameState.gameOver) gameOverModal.classList.add("active");
+        }, 30 * gameState.minesCount + 300));
     }
 }
 

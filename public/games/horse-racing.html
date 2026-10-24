@@ -1288,7 +1288,7 @@
                 { id: 'first_bankrupt', name: '初次破产', desc: '首次破产', icon: '💀', check: s => s.bankruptCount >= 1 },
                 { id: 'bankrupt3', name: '再三破产', desc: '破产3次仍不放弃', icon: '🔄', check: s => s.bankruptCount >= 3 },
                 { id: 'rich20k', name: '大富豪', desc: '资金峰值达到20000', icon: '🏦', check: s => s.peakMoney >= 20000 },
-                { id: 'net2k', name: '净赢家', desc: '净赢筹码达到2000', icon: '💵', check: s => (s.totalWon - s.totalLost) >= 2000 },
+                { id: 'net2k', name: '净赢家', desc: '净赢筹码达到2000', icon: '💵', check: s => (s.totalWon - s.totalBet) >= 2000 },
                 { id: 'photo_win', name: '千钧一发', desc: '在照片判定局押中冠军', icon: '📸', check: s => s.photoWins >= 1 }
             ];
 
@@ -1308,7 +1308,7 @@
                         darkHorseTop3: 0, photoWins: 0,
                         bankruptCount: 0, peakMoney: CONFIG.initialMoney, lowestMoney: CONFIG.initialMoney,
                         postBankrupt: false, phoenixCount: 0,
-                        comebackLowMark: 0, comebackCount: 0,
+                        comebackLowMark: -1, comebackCount: 0,   // -1 = 尚未跌破 100（用 0 会与「余额正好归零」混淆）
                         laneWins: {}, nameWins: {},
                         unlockedAchievements: []
                     };
@@ -1317,7 +1317,12 @@
                     const defaults = this._defaults();
                     try {
                         const raw = localStorage.getItem(KEYS.stats);
-                        if (raw) return Object.assign(defaults, JSON.parse(raw));
+                        if (raw) {
+                            const loaded = Object.assign(defaults, JSON.parse(raw));
+                            // 旧存档用 0 表示「未跌破」，语义已改为 -1，读档时迁移
+                            if (loaded.comebackLowMark === 0) loaded.comebackLowMark = -1;
+                            return loaded;
+                        }
                     } catch (_) {}
                     return defaults;
                 }
@@ -1327,7 +1332,7 @@
                     } catch (_) {}
                 }
                 get unlocked() { return this.data.unlockedAchievements; }
-                recordRace({ win, rank, bet, payout, odds, isFavorite, allIn, photo, lane, name }) {
+                recordRace({ win, rank, darkHorse, bet, payout, odds, isFavorite, allIn, photo, lane, name }) {
                     const d = this.data;
                     d.totalRaces++;
                     d.totalBet += bet;
@@ -1352,7 +1357,7 @@
                         d.currentLossStreak++;
                         if (d.currentLossStreak > d.bestLossStreak) d.bestLossStreak = d.currentLossStreak;
                     }
-                    if (rank && rank <= 3 && odds >= 5) d.darkHorseTop3++;
+                    if (darkHorse) d.darkHorseTop3++;
                     this._checkAchievements();
                     this.save();
                 }
@@ -1371,10 +1376,10 @@
                         d.postBankrupt = false;
                     }
                     if (m < 100) {
-                        if (!d.comebackLowMark) d.comebackLowMark = m;
-                    } else if (d.comebackLowMark > 0 && m >= d.comebackLowMark + 500) {
+                        if (d.comebackLowMark < 0) d.comebackLowMark = m;
+                    } else if (d.comebackLowMark >= 0 && m >= d.comebackLowMark + 500) {
                         d.comebackCount++;
-                        d.comebackLowMark = 0;
+                        d.comebackLowMark = -1;
                     }
                 }
                 _checkAchievements() {
@@ -1403,7 +1408,8 @@
                         bestLossStreak: d.bestLossStreak,
                         totalWon: d.totalWon,
                         totalLost: d.totalLost,
-                        net: d.totalWon - d.totalLost,
+                        // 派彩含本金，净赢要减掉全部下注额（原来只减输掉的那些，把本金算成了盈利）
+                        net: d.totalWon - d.totalBet,
                         avgBet: d.totalRaces > 0 ? (d.totalBet / d.totalRaces).toFixed(1) : '0.0',
                         maxBet: d.maxBet,
                         maxPayout: d.maxPayout,
@@ -1430,6 +1436,11 @@
                     this.stats = new StatsManager();
 
                     this.money = this._loadMoney();
+                    // 资金峰值/低谷以实际余额为起点：默认值会让「资金低谷」显示成从未发生的初始值
+                    const sd = this.stats.data;
+                    if (sd.lowestMoney > this.money) sd.lowestMoney = this.money;
+                    if (sd.peakMoney < this.money) sd.peakMoney = this.money;
+                    this.stats.save();
                     this.horses = [];
                     this.betMap = {};
                     this.activeLane = -1;
@@ -1437,6 +1448,7 @@
                     this.raceData = [];
                     this.finishOrder = [];
                     this._rafId = 0;
+                    this._resultTimer = 0;
                     this._cdTimers = [];
                     this._toastQueue = [];
                     this._toastShowing = false;
@@ -1651,6 +1663,8 @@
                 }
 
                 _newRace() {
+                    clearTimeout(this._resultTimer); // 丢弃上一局未弹出的结算弹窗，避免砸到新局
+                    this._resultTimer = 0;
                     this.horses = generateHorses();
                     this.betMap = {};
                     this.activeLane = -1;
@@ -1861,6 +1875,7 @@
                             this._lastHoof = now;
                         }
                         let allDone = true;
+                        const justFinished = [];
                         this.horses.forEach((h, i) => {
                             const r = this.raceData[i];
                             let progress;
@@ -1869,18 +1884,24 @@
                             } else if (t >= r.finishTime) {
                                 r.finished = true;
                                 progress = 1;
-                                this.finishOrder.push(i);
-                                if (this.finishOrder.length === 1) {
-                                    this.laneEls[i].finishEl.classList.add('flash');
-                                    setTimeout(() => this.laneEls[i].finishEl.classList.remove('flash'), 1000);
-                                }
+                                justFinished.push(i);
                             } else {
                                 const u = t / r.finishTime;
-                                progress = Math.pow(u, r.curve) + r.wA * Math.sin(6.2832 * r.wF * u + r.wPhi);
-                                progress = Math.max(0, Math.min(0.995, progress));
+                                // 摆动幅度随赛程衰减：末段显示名次不再被波形随机打乱（否则徽章名次会与终点判定矛盾）
+                                progress = Math.pow(u, r.curve) + r.wA * Math.sin(6.2832 * r.wF * u + r.wPhi) * (1 - u);
+                                progress = Math.max(0, Math.min(0.999, progress));
                             }
                             h.progress = progress;
                             if (!r.finished) allDone = false;
+                        });
+                        // 同一帧内冲线的马按 finishTime 精确排序：原来按赛道号入队，名次/派彩会和计时矛盾
+                        justFinished.sort((a, b) => this.raceData[a].finishTime - this.raceData[b].finishTime);
+                        justFinished.forEach(i => {
+                            this.finishOrder.push(i);
+                            if (this.finishOrder.length === 1) {
+                                this.laneEls[i].finishEl.classList.add('flash');
+                                setTimeout(() => this.laneEls[i].finishEl.classList.remove('flash'), 1000);
+                            }
                         });
                         const order = this.horses.map((h, i) => i).sort((a, b) => this.horses[b].progress - this.horses[a].progress);
                         order.forEach((lane, idx) => {
@@ -1924,13 +1945,24 @@
                     const bet = this._moneyBeforeRace - this.money;
                     const isWin = (this.betMap[winLane] || 0) > 0;
                     const payout = isWin ? Math.round(this.betMap[winLane] * this.horses[winLane].odds) : 0;
+                    // 押注马的最好名次 + 是否有「x5 以上冷门马跑进前三」（原来 rank 只会是 1/0，该成就实际只在押中冠军时点亮）
+                    let bestBetRank = 0, darkHorse = false;
+                    Object.keys(this.betMap).forEach(k => {
+                        const lane = +k;
+                        if (!(this.betMap[lane] > 0)) return;
+                        const rk = this.finishOrder.indexOf(lane) + 1;
+                        if (rk <= 0) return;
+                        if (!bestBetRank || rk < bestBetRank) bestBetRank = rk;
+                        if (rk <= 3 && this.horses[lane].odds >= 5) darkHorse = true;
+                    });
                     if (payout > 0) this.money += payout;
                     this._updateMoneyDisplay();
                     this._saveMoney();
                     try {
                         this.stats.recordRace({
                             win: isWin,
-                            rank: isWin ? 1 : 0,
+                            rank: bestBetRank,
+                            darkHorse,
                             bet,
                             payout,
                             odds: this.horses[winLane].odds,
@@ -1955,6 +1987,7 @@
                     }
                     setTimeout(() => {
                         try {
+                            if (this.state !== 'result') return; // 已重开/重生：丢弃这一局的结算弹窗
                             this._showResult(photo, diff, bet, payout, isWin, winLane);
                         } catch (err) {
                             console.error(err);

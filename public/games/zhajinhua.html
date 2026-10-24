@@ -198,7 +198,7 @@ const AI_DEFS=[
 ];
 function mkPlayer(def,i){
   return {idx:i,name:def.name,avatar:def.avatar,isUser:i===0,
-    chips:i===0?myChips:START_CHIPS,hand:[],paid:0,folded:false,looked:false,allIn:false,
+    chips:i===0?myChips:START_CHIPS,hand:[],paid:0,invested:0,folded:false,looked:false,allIn:false,
     strength:0,personality:def||null,acted:false};
 }
 function alive(){return S.players.filter(p=>!p.folded);}
@@ -213,12 +213,13 @@ function newRound(){
   S.players.forEach((p,i)=>{
     if(i>0&&p.chips<ANTE)p.chips=START_CHIPS; // AI 破产默默补
     p.hand=[deck.pop(),deck.pop(),deck.pop()];
-    p.paid=0;p.folded=false;p.allIn=false;p.acted=false;
+    p.paid=0;p.invested=0;p.folded=false;p.allIn=false;p.acted=false;
     p.looked=i===0?false:Math.random()<.55;
     p.strength=i===0?0:handStrength(p.hand);
   });
-  S.pot=0;S.curBet=BET_LEVELS[0];S.orbit=0;S.compareMode=false;S.busy=false;S.orbitStarter=-1;
-  S.players.forEach(p=>{const a=Math.min(ANTE,p.chips);p.chips-=a;S.pot+=a;});
+  S.pot=0;S.curBet=BET_LEVELS[0];S.orbit=0;S.compareMode=false;S.busy=false;S.orbitStarter=-1;S.roundOver=false;
+  S.seq=(S.seq||0)+1; // 局序号：作废上一局遗留的定时器回调
+  S.players.forEach(p=>{const a=Math.min(ANTE,p.chips);p.chips-=a;p.invested+=a;S.pot+=a;});
   S.dealer=(S.dealer+1)%4;
   S.turnIdx=S.dealer;
   log('新一局，底注 '+ANTE);
@@ -231,6 +232,7 @@ function nextIdx(){
 }
 /* 推进: 找下一个能行动的 */
 function advance(){
+  if(S.roundOver)return; // 已结算：作废迟到的推进，防止重复派彩
   render();
   const al=alive();
   if(al.length===1)return endRound(al[0],'其他人都弃牌了');
@@ -248,7 +250,7 @@ function advance(){
   render();
   const p=S.players[n];
   if(p.isUser){userTurn();}
-  else{S.busy=true;setTimeout(()=>{aiAct(p);S.busy=false;},userOut()?380:700+Math.random()*650);}
+  else{S.busy=true;const seq=S.seq;setTimeout(()=>{if(seq!==S.seq)return;aiAct(p);S.busy=false;},userOut()?380:700+Math.random()*650);}
 }
 function userOut(){const u=S.players[0];return u.folded||u.allIn;}
 /* ---- 用户行动 ---- */
@@ -257,8 +259,10 @@ function userTurn(){
   log('轮到你行动'+(S.players[0].looked?'（已看牌，下注×2）':'（闷牌中，可看牌）'));
 }
 function uBet(kind){ // 'call' 'raise' 'fold' 'look'
-  if(S.busy)return;
+  if(S.busy||S.roundOver)return;
   const p=S.players[0];
+  // 只在自己回合、且自己还能行动时才接受操作（否则残留按钮会跨回合下注/弃牌）
+  if(S.turnIdx!==0||!canAct(p))return;
   if(kind==='look'){p.looked=true;log('你看了牌：'+handStr(p.hand)+'（'+typeStr(p.hand)+'）');renderButtons();render();return;}
   if(kind==='fold'){p.folded=true;log('你弃牌了');afterAct(p);return;}
   if(kind==='raise'){
@@ -268,7 +272,7 @@ function uBet(kind){ // 'call' 'raise' 'fold' 'look'
     S.orbitStarter=p.idx;
   }
   const tc=toCall(p),pay=Math.min(tc,p.chips);
-  p.chips-=pay;p.paid+=pay;S.pot+=pay;
+  p.chips-=pay;p.paid+=pay;p.invested+=pay;S.pot+=pay;
   if(p.chips<=0)p.allIn=true;
   log(kind==='raise'?('你加注到 '+S.curBet+(p.looked?'（明×2）':'')):('你跟注 '+pay));
   afterAct(p);
@@ -280,16 +284,21 @@ function afterAct(p){
 }
 /* ---- 比牌 ---- */
 function startCompare(){
-  const cost=2*S.curBet*(S.players[0].looked?2:1);
-  if(S.players[0].chips<cost&&S.players[0].chips<=0){log('筹码不够比牌');return;}
-  S.compareMode=true;renderButtons();
-  log('点选一位对手比牌（费用约 '+Math.min(cost,S.players[0].chips)+'）');
+  const u=S.players[0];
+  if(S.busy||S.roundOver||S.turnIdx!==0||!canAct(u))return;
+  const cost=2*S.curBet*(u.looked?2:1);
+  if(u.chips<cost){log('筹码不够比牌（需 '+cost+'）');return;}
+  S.compareMode=true;
+  render(); // 先重绘（renderButtons 会清空 hint），提示语放在后面才不会被立刻抹掉
   $('hint').textContent='点上面的对手头像比牌，或取消';
-  render();
+  log('点选一位对手比牌（费用 '+cost+'）');
 }
 function doCompare(a,b){
+  if(!canAct(a)||!b||b.folded||a===b)return;
+  S.busy=true; // 比牌动画期间锁住操作，等动画结束再推进（否则动画里还能再出手，推进两次）
+  // 比牌费是「手续费」，不计入 paid（paid 表示已跟注额，计入会让后续跟注被错误减免）
   const cost=2*S.curBet*(a.looked?2:1),pay=Math.min(cost,a.chips);
-  a.chips-=pay;a.paid+=pay;S.pot+=pay;if(a.chips<=0)a.allIn=true;
+  a.chips-=pay;a.invested+=pay;S.pot+=pay;if(a.chips<=0)a.allIn=true;
   const r=cmpHands(a.hand,b.hand);
   const winner=r>=0?a:b,loser=winner===a?b:a;
   loser.folded=true;
@@ -299,18 +308,20 @@ function doCompare(a,b){
   log(msg);
   if(a.isUser||b.isUser)showComparePanel(a,b,winner);
   render();
-  setTimeout(()=>{hideOverlay();afterAct(a);},a.isUser||b.isUser?2600:900);
+  const seq=S.seq;
+  setTimeout(()=>{if(seq!==S.seq)return;S.busy=false;hideOverlay();afterAct(a);},a.isUser||b.isUser?2600:900);
 }
 /* ---- AI ---- */
 function aiAct(p){
   if(!canAct(p)){advance();return;}
+  const seq=S.seq;
   const al=alive();
   // 双人且几轮了: 强牌或随机主动比牌, 保证终局
   if(al.length===2&&S.orbit>=2&&(p.strength>.35||Math.random()<.4)){
     const tgt=al.find(q=>q!==p);
     log(p.name+' 发起比牌！');
     render();
-    setTimeout(()=>doCompare(p,tgt),650);
+    setTimeout(()=>{if(seq!==S.seq)return;doCompare(p,tgt);},650);
     return;
   }
   const tc=toCall(p),per=p.personality,r=Math.random();
@@ -334,12 +345,12 @@ function aiAct(p){
     const i=BET_LEVELS.indexOf(S.curBet);
     S.curBet=BET_LEVELS[i+1];S.orbitStarter=p.idx;
     const pay=Math.min(toCall(p),p.chips);
-    p.chips-=pay;p.paid+=pay;S.pot+=pay;if(p.chips<=0)p.allIn=true;
+    p.chips-=pay;p.paid+=pay;p.invested+=pay;S.pot+=pay;if(p.chips<=0)p.allIn=true;
     const bluffing=s<.38;
     log(p.name+(bluffing?' 凶狠加注到 ':' 加注到 ')+S.curBet+(p.looked?'（明×2）':''));
   }else if(act==='call'){
     const pay=Math.min(tc,p.chips);
-    p.chips-=pay;p.paid+=pay;S.pot+=pay;if(p.chips<=0)p.allIn=true;
+    p.chips-=pay;p.paid+=pay;p.invested+=pay;S.pot+=pay;if(p.chips<=0)p.allIn=true;
     log(p.name+' 跟注 '+pay+(p.looked?'（明牌）':'（闷牌）'));
   }else{
     p.folded=true;
@@ -347,20 +358,52 @@ function aiAct(p){
   }
   p.acted=true;
   render();
-  setTimeout(advance,420);
+  setTimeout(()=>{if(seq===S.seq)advance();},420);
 }
 /* ---- 结算 ---- */
 function showdown(reason){
   const al=alive().filter(p=>!p.folded);
+  if(!al.length)return; // 无人可判（理论上不会发生，兜底防崩）
   let win=al[0];
   for(const p of al)if(cmpHands(p.hand,win.hand)>0)win=p;
   endRound(win,reason+'，'+win.name+'以'+typeStr(win.hand)+'获胜');
 }
+/* 边池派彩：底池按各人投入额分层，每层归「投入达到该层且未弃牌」的最大牌；
+ * 这样筹码不足全下的玩家只能赢走自己投入的等额部分，不会以小博大拿走整池。
+ * 无人符合的层（对应玩家都已弃牌）归最终赢家。返回 idx -> 金额，并已入账。 */
+function payout(fallback){
+  const levels=[...new Set(S.players.map(p=>p.invested))].filter(v=>v>0).sort((a,b)=>a-b);
+  const inHand=S.players.filter(p=>!p.folded);
+  const pay={};
+  let prev=0;
+  for(const lv of levels){
+    let amount=0;
+    for(const p of S.players)amount+=Math.min(p.invested,lv)-Math.min(p.invested,prev);
+    let w=fallback;
+    const eligible=inHand.filter(p=>p.invested>=lv);
+    if(eligible.length){
+      w=eligible[0];
+      for(const p of eligible)if(cmpHands(p.hand,w.hand)>0)w=p;
+    }
+    pay[w.idx]=(pay[w.idx]||0)+amount;
+    prev=lv;
+  }
+  if(!levels.length)pay[fallback.idx]=(pay[fallback.idx]||0)+S.pot;
+  S.players.forEach(p=>{if(pay[p.idx])p.chips+=pay[p.idx];});
+  return pay;
+}
 function endRound(winner,reason){
-  winner.chips+=S.pot;
+  S.roundOver=true;
+  const pay=payout(winner);
+  const winners=S.players.filter(p=>pay[p.idx]>0);
+  let main=winner;
+  for(const p of winners)if(pay[p.idx]>pay[main.idx])main=p;
   myChips=S.players[0].chips;saveChips();
-  const al=alive();
-  let html='<h2>🎉 '+winner.name+' 赢了 '+S.pot+'</h2><div class="big">'+reason+'</div><div class="cardsrow">';
+  let html='<h2>🎉 '+main.name+' 赢了 '+pay[main.idx]+'</h2><div class="big">'+reason+'</div>';
+  if(winners.length>1){
+    html+='<div class="big">'+winners.filter(p=>p!==main).map(p=>p.name+' 赢回 '+pay[p.idx]).join('，')+'（边池）</div>';
+  }
+  html+='<div class="cardsrow">';
   for(const p of S.players){
     if(p.folded)continue;
     html+=p.hand.map(c=>miniCard(c,false)).join('');
@@ -394,14 +437,14 @@ function render(){
     const cards=p.hand.map(c=>miniCard(c,p.folded?false:true)).join('');
     $(spots[k]).innerHTML='<div class="'+cls+'" data-i="'+p.idx+'"><div class="avatar">'+p.avatar+'</div>'
       +'<div class="nm">'+p.name+(p.looked?' 👁':'')+'</div>'
-      +'<div class="chips">💰'+p.chips+'</div><div class="bet">已下 '+p.paid+'</div>'
+      +'<div class="chips">💰'+p.chips+'</div><div class="bet">已下 '+p.invested+'</div>'
       +'<div class="cards">'+cards+'</div>'
       +'<div class="st">'+(p.folded?'弃牌':p.allIn?'全下':'')+'</div></div>';
   });
   // 点击比牌目标
   document.querySelectorAll('#table .seat').forEach(el=>{
     el.onclick=()=>{
-      if(!S.compareMode)return;
+      if(!S.compareMode||S.roundOver||S.turnIdx!==0)return;
       const p=S.players[+el.dataset.i];
       if(p.folded)return;
       S.compareMode=false;
@@ -415,11 +458,13 @@ function render(){
     const red=c.s===1||c.s===3?' red':'';
     return '<div class="card'+red+'"><div class="rk">'+RANK_TXT[c.r]+'</div><div class="st">'+SUIT_TXT[c.s]+'</div></div>';
   }).join('');
-  $('uchips').textContent='💰'+u.chips+'（已下 '+u.paid+'）';
+  $('uchips').textContent='💰'+u.chips+'（已下 '+u.invested+'）';
   $('ulooked').style.display=u.looked?'inline':'none';
   $('uhand').textContent=u.looked?('你的牌：'+typeStr(u.hand)):'';
   $('userbox').className=S.turnIdx===0&&canAct(u)?'active':'';
-  if(S.turnIdx===0&&canAct(u)&&!S.busy)renderButtons();
+  // 只在自己回合重建按钮，否则清空——残留按钮会跨回合出手（下注/弃牌/比牌）
+  if(!S.roundOver&&S.turnIdx===0&&canAct(u)&&!S.busy)renderButtons();
+  else $('btns').innerHTML='';
 }
 function renderButtons(){
   const u=S.players[0],box=$('btns');
@@ -464,7 +509,7 @@ function showHelp(){
 }
 /* ============ 启动 ============ */
 function init(){
-  S={players:[mkPlayer({name:'你',avatar:'😎'},0)].concat(AI_DEFS.map((d,i)=>mkPlayer(d,i+1))),pot:0,curBet:10,turnIdx:0,orbitStarter:0,orbit:0,dealer:3,compareMode:false,busy:false};
+  S={players:[mkPlayer({name:'你',avatar:'😎'},0)].concat(AI_DEFS.map((d,i)=>mkPlayer(d,i+1))),pot:0,curBet:10,turnIdx:0,orbitStarter:0,orbit:0,dealer:3,compareMode:false,busy:false,roundOver:false,seq:0};
   S.players[0].chips=myChips;
   if(myChips<ANTE){myChips=START_CHIPS;S.players[0].chips=START_CHIPS;saveChips();}
   $('helpbtn').onclick=showHelp;

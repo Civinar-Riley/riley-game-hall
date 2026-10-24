@@ -1596,7 +1596,7 @@
                         postBankruptChipsWon: 0,
                         quadSplitWins: 0,
                         biggestRoundWin: 0,
-                        comebackLowMark: 0,        // 首次跌破100时的筹码，0=未跌破
+                        comebackLowMark: -1,       // 首次跌破100时的筹码，-1=尚未跌破（用 0 会与「筹码正好归零」混淆）
                         // 扩展统计字段
                         allInWins: 0,              // 全押(>=1000)胜场
                         soft21Count: 0,            // 软21次数(A算11达到21)
@@ -1608,7 +1608,12 @@
                     };
                     try {
                         const raw = localStorage.getItem('bj_stats_v2');
-                        if (raw) return Object.assign(defaults, JSON.parse(raw));
+                        if (raw) {
+                            const loaded = Object.assign(defaults, JSON.parse(raw));
+                            // 旧存档用 0 表示"未跌破"，语义已改为 -1，读档时统一迁移
+                            if (loaded.comebackLowMark === 0) loaded.comebackLowMark = -1;
+                            return loaded;
+                        }
                     } catch (_) {}
                     return defaults;
                 }
@@ -1701,17 +1706,17 @@
 
                 _checkComeback(chips) {
                     if (chips < 100) {
-                        if (this.data.comebackLowMark === 0) this.data.comebackLowMark = chips;
-                    } else if (this.data.comebackLowMark > 0 && chips >= this.data.comebackLowMark + 500) {
+                        if (this.data.comebackLowMark < 0) this.data.comebackLowMark = chips;
+                    } else if (this.data.comebackLowMark >= 0 && chips >= this.data.comebackLowMark + 500) {
                         this.data.comebackCount++;
-                        this.data.comebackLowMark = 0; // 重置，可再次触发
+                        this.data.comebackLowMark = -1; // 重置，可再次触发
                         this._checkAchievements();
                         this.save();
                     }
                 }
 
                 _checkAchievements() {
-                    this._checkNewAchievements = [];
+                    // 只解锁、不清空：recordGame 之后紧跟 recordRound，清空会把刚解锁的成就吞掉
                     for (const ach of ACHIEVEMENTS) {
                         if (!this.data.unlockedAchievements.includes(ach.id) && ach.check(this.data)) {
                             this.data.unlockedAchievements.push(ach.id);
@@ -1884,8 +1889,10 @@
                     const isDealer = s === 'dealerTurn';
                     const isGameOver = s === 'gameOver';
                     const isIdle = s === 'idle' && !this.waitingForInsurance;
-                    // 下注区在下注与结算后两个状态可见（保险等待时隐藏）
-                    const showBetting = (s === 'idle' || s === 'gameOver') && !this.waitingForInsurance;
+                    // 能开新一局：下注阶段或结算后
+                    const canStartRound = (s === 'idle' || s === 'gameOver') && !this.waitingForInsurance;
+                    // 下注区只在 idle 可见：gameOver 下 _addBet 会直接 return，显示出来只是一排死按钮
+                    const showBetting = isIdle;
 
                     this.el.btnHit.disabled = !isPlaying;
                     this.el.btnStand.disabled = !isPlaying;
@@ -1894,7 +1901,7 @@
                     this.el.btnDeal.disabled = !isIdle || this.currentBet < CONFIG.minBet || this.chips < this.currentBet;
                     this.el.btnClearBet.disabled = !showBetting || this.currentBet === 0;
                     // 同注再战：结算后/下注时沿用上局赌注直接开局
-                    this.el.btnRebet.disabled = !showBetting ||
+                    this.el.btnRebet.disabled = !canStartRound ||
                         this.lastBet < CONFIG.minBet || this.lastBet > this.chips || this.lastBet > CONFIG.maxBet;
                     this.el.btnRebet.textContent = this.lastBet > 0 ? '🔁 同注再战 ' + this.lastBet : '🔁 同注再战';
 
@@ -1903,8 +1910,9 @@
                     this.el.btnRebuy.classList.toggle('hidden-btn', !(broke && (s === 'idle' || s === 'gameOver')));
 
                     // 右下角按钮仅用于重置到可下注状态，不发牌
+                    // 牌局进行中禁止重置：resetGame 会退还本局赌注，等于让玩家看完牌零成本反悔
                     this.el.btnReset.textContent = '🔄 重新下注';
-                    this.el.btnReset.disabled = isDealer;
+                    this.el.btnReset.disabled = isDealer || isPlaying;
 
                     // 下注区域可见性（见 showBetting）
                     this.el.bettingArea.classList.toggle('hidden', !showBetting);
@@ -2045,6 +2053,11 @@
                 }
 
                 _offerInsurance() {
+                    // 玩家已是黑杰克：不提供保险，直接进 _afterDeal 判「双方黑杰克=平局 / 否则 3:2 赔付」
+                    if (this.playerHands[0].isBlackjack) {
+                        this._afterDeal();
+                        return;
+                    }
                     const cost = Math.floor(this.currentBet / 2);
                     if (this.chips < cost) {
                         // 筹码不够买保险，直接跳过
@@ -2068,6 +2081,9 @@
                         const cost = Math.floor(this.currentBet / 2);
                         this.insuranceBet = cost;
                         this.chips -= cost;
+                        // 保费计入累计投入：赔付走 totalChipsWon，不记支出会把净赢统计抬高一截
+                        this.stats.data.totalChipsLost += cost;
+                        this.stats.save();
                         this._updateChipDisplay();
                         this._saveChips();
                         this.insuranceActive = true;
@@ -2089,6 +2105,7 @@
                             this._endRound('lose', '庄家黑杰克！保险赔付 ' + payout + '，主注输 ' + this.currentBet + '（净亏 ' + (this.currentBet - this.insuranceBet) + '）💀', 'lose');
                         } else {
                             this.stats.recordGame('lose', this.currentBet);
+                            this.stats.recordRound({ handsCount: 1, allWon: false, netWin: -this.currentBet });
                             this._endRound('lose', '庄家黑杰克！你输了... 💀', 'lose');
                         }
                         return;
@@ -2166,6 +2183,8 @@
                     } else {
                         this.sfx.hit();
                         this._showMessage('继续要牌还是停牌？', '');
+                        // 手牌变了：加倍/分牌可能已不可用，刷新按钮状态
+                        this._updateButtons();
                     }
                 }
 
@@ -2461,6 +2480,8 @@
                         allWon: results.length > 0 && results.every(r => r === 'win'),
                         netWin: totalWin - totalLoseAmt,
                     });
+                    // recordGame/recordRound 内的检查只负责解锁，提示在这里统一弹
+                    this._checkAchievements();
 
                     this._saveChips();
                     this._updateButtons();

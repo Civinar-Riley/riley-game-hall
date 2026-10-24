@@ -774,7 +774,8 @@ const app = {
     tips: 0,
     pendingCheck: false,
     animating: false,
-    sessionId: 0
+    sessionId: 0,
+    boardVersion: 0
   },
   els: {}
 };
@@ -1159,6 +1160,9 @@ async function handleStart() {
   uniqueSeqs.forEach((seq, idx) => { maps[seq] = emojiList[idx]; });
   app.state.emojiMap = maps;
   app.state.boxes = boxes;
+  // 换代标记：在飞的动画续体（handleCheck / handleTips 的 await 之后）据此放弃对新棋盘的写入
+  app.state.boardVersion++;
+  app.state.pendingCheck = false;
   app.state.rearrangement = li.rearrangement;
   app.state.tips = li.tips;
   hideLoading();
@@ -1200,6 +1204,7 @@ function autoRearrange() {
 
 async function handleTips() {
   if (app.state.tips <= 0 || app.state.gameStatus !== GameStatus.playing) return;
+  const version = app.state.boardVersion;
   app.state.gameStatus = GameStatus.inTheAnimation;
   updatePropsDisplay();
 
@@ -1208,6 +1213,8 @@ async function handleTips() {
     SoundFX.play('tip');
     checkedItems.forEach(it => { it.status = 'checked'; updateBoxStyle(it); });
     await sleep(900);
+    // 棋盘已换代 / 已退出到首页：放弃收尾写入，否则会把新棋盘的牌改成隐形不可点
+    if (version !== app.state.boardVersion || app.state.gameStatus !== GameStatus.inTheAnimation) return;
     checkedItems.forEach(it => { it.status = 'default'; updateBoxStyle(it); });
     app.state.tips--;
   } else {
@@ -1242,6 +1249,7 @@ async function handleCheck(box) {
   app.state.pendingCheck = true;
   app.state.gameStatus = GameStatus.inTheAnimation;
   updatePropsDisplay();
+  const version = app.state.boardVersion;
 
   const [canRemove, crossItems] = canIRemoveThem(nowChecked.slice(0, 2), app.state.levelInfo);
   if (canRemove) {
@@ -1251,6 +1259,12 @@ async function handleCheck(box) {
     SoundFX.play('error');
     nowChecked.forEach(it => { it.status = 'error'; updateBoxStyle(it); });
     await sleep(220);
+  }
+
+  // 棋盘已换代 / 已退出到首页：放弃收尾写入，否则会把新棋盘的牌改成隐形不可点、或弹出通关窗
+  if (version !== app.state.boardVersion || app.state.gameStatus !== GameStatus.inTheAnimation) {
+    app.state.pendingCheck = false; // 必须解锁，否则新棋盘会点不动
+    return;
   }
 
   nowChecked.forEach(it => {
