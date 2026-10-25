@@ -261,6 +261,21 @@ test('suika fallback dispose clears once, releases its shadow and makes subseque
   assert.equal(pointer.mock.callCount(), 1, 'renderer does not remove application input handlers');
 });
 
+test('suika fallback setTheme swaps palettes safely and stays inert after dispose', t => {
+  const { canvas, create } = fixture(t);
+  const renderer = create();
+  renderer.setTheme('dark');
+  renderer.render(FRUIT_STATE, { showAim: true });
+  assert.ok(canvas.commands('drawImage').length >= 7, 'dark palette still draws the pile and preview');
+  renderer.setTheme('nonsense');
+  renderer.render(EMPTY, { showAim: false });
+  assert.deepEqual(canvas.commands('setTransform').at(-1), [1, 0, 0, 1, 0, 0]);
+  renderer.dispose();
+  const callsAfterDispose = canvas.calls.length;
+  renderer.setTheme('light');
+  assert.equal(canvas.calls.length, callsAfterDispose, 'setTheme after dispose draws nothing');
+});
+
 test('suika locked-context fallback keeps input canvas and places its surface below HTML overlays', t => {
   const { canvas, parent, htmlOverlay, create } = fixture(t, { locked: true, dpr: 3 });
   const pointer = t.mock.fn();

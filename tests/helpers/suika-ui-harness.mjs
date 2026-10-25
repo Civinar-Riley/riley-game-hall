@@ -109,6 +109,7 @@ class Element extends EventTarget {
 function createDocument() {
   const document = new EventTarget();
   const nodes = new Map();
+  document.documentElement = new Element('html', document);
   document.body = new Element('body', document);
   document.activeElement = document.body;
   document.hidden = false;
@@ -156,7 +157,7 @@ function createClock() {
   return clock;
 }
 
-export function bootSuika(t, { book, storage = memoryStorage({ book }), coarse = true } = {}) {
+export function bootSuika(t, { book, storage = memoryStorage({ book }), coarse = true, darkSystem = false } = {}) {
   const document = createDocument();
   const window = new EventTarget();
   const clock = createClock();
@@ -165,11 +166,12 @@ export function bootSuika(t, { book, storage = memoryStorage({ book }), coarse =
   const bounds = { left: 37, top: 91, width: WORLD.width / 2, height: WORLD.height / 2 };
   canvas.getBoundingClientRect = () => ({ ...bounds });
   const renderer = {
-    kind: 'webgl', renders: [], bursts: [], sizes: [], effects: [], clearEffectsCalls: 0,
+    kind: 'webgl', renders: [], bursts: [], sizes: [], effects: [], themes: [], clearEffectsCalls: 0,
     burst(event) { this.bursts.push(event); this.effects.push(event); },
     clearEffects() { this.clearEffectsCalls++; this.effects.length = 0; },
     resize(width, height) { this.sizes.push({ width, height }); },
     render(state, options) { this.renders.push({ state, options }); },
+    setTheme(theme) { this.themes.push(theme); },
   };
   let sound;
   class OrchardSound {
@@ -183,7 +185,9 @@ export function bootSuika(t, { book, storage = memoryStorage({ book }), coarse =
     fruitIcon: tier => `test-fruit:${tier}`,
     createFruitRenderer: () => renderer,
     OrchardSound,
-    matchMedia: query => ({ matches: query === '(pointer: coarse)' && coarse }),
+    matchMedia: query => ({
+      matches: (query === '(pointer: coarse)' && coarse) || (query === '(prefers-color-scheme: dark)' && darkSystem),
+    }),
     ResizeObserver: class { observe() {} },
     performance: { now: () => clock.now },
     setTimeout: clock.setTimeout, clearTimeout: clock.clearTimeout,

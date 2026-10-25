@@ -9,6 +9,9 @@ const canvas = $('fruitCanvas');
 const book = loadBook({ getItem: key => localStorage.getItem(key) });
 const sound = new OrchardSound(book.muted);
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const systemDark = matchMedia('(prefers-color-scheme: dark)');
+// book.theme is the explicit choice; without one the game follows the system.
+let theme = book.theme ?? (systemDark.matches ? 'dark' : 'light');
 let game;
 let renderer;
 let aimX = WORLD.width / 2;
@@ -136,6 +139,22 @@ function updateMode() {
     : '相同水果相碰就会长大。西瓜留在篮子里，看看能得多少分。';
   $('harvestLabel').textContent = collecting ? '今日西瓜收集' : '本局的小成就';
   $('harvestDescription').textContent = collecting ? '合出即收集 · 快乐不设上限' : '向第一颗西瓜出发';
+}
+
+function applyTheme() {
+  document.documentElement.setAttribute('data-theme', theme);
+  $('themeButton').textContent = theme === 'dark' ? '☀' : '☾';
+  $('themeButton').setAttribute('aria-pressed', String(theme === 'dark'));
+  $('themeButton').setAttribute('aria-label', theme === 'dark' ? '切换亮色主题' : '切换暗色主题');
+  $('themeMeta').content = theme === 'dark' ? '#131e18' : '#f7f5e9';
+  renderer?.setTheme?.(theme);
+}
+
+function toggleTheme() {
+  theme = theme === 'dark' ? 'light' : 'dark';
+  book.theme = theme;
+  applyTheme();
+  persist();
 }
 
 function pause() {
@@ -283,10 +302,17 @@ function toggleSound() {
   updateUI(game.getState());
 }
 $('soundButton').addEventListener('click', toggleSound);
+$('themeButton').addEventListener('click', toggleTheme);
+systemDark.addEventListener?.('change', event => {
+  if (book.theme !== null) return;
+  theme = event.matches ? 'dark' : 'light';
+  applyTheme();
+});
 
 document.addEventListener('keydown', event => {
   if ($('helpDialog').open || $('confirmDialog').open || event.ctrlKey || event.metaKey || event.altKey) return;
   if (event.key.toLowerCase() === 'm' && !event.repeat) { toggleSound(); return; }
+  if (event.key.toLowerCase() === 't' && !event.repeat) { toggleTheme(); return; }
   if (event.key.toLowerCase() === 'p' && !event.repeat) {
     if (game.getState().phase === 'playing') pause();
     else if (game.getState().phase === 'paused') begin();
@@ -332,6 +358,7 @@ if (matchMedia('(pointer: coarse)').matches) $('inputHint').textContent = '按�
 game = createGame(book.mode);
 renderer = createFruitRenderer(canvas, {
   reducedMotion,
+  theme,
   onContextLost: () => {
     contextUnavailable = true;
     pause();
@@ -345,6 +372,7 @@ renderer = createFruitRenderer(canvas, {
   },
 });
 if (renderer.kind === 'canvas') toast('已启用轻量画面，玩法和存档不受影响。', 4000);
+applyTheme();
 function resize() {
   const rect = canvas.getBoundingClientRect();
   renderer.resize(rect.width, rect.height);

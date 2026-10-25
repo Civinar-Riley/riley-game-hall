@@ -4,10 +4,11 @@ import { FRUITS, WORLD } from '../src/games/suika/core.js';
 import { emptyBook, SAVE_KEY } from '../src/games/suika/storage.js';
 import { bootSuika, fruit, memoryStorage, savedGame } from './helpers/suika-ui-harness.mjs';
 
-function savedBook({ mode = 'classic', classic, collect, records, muted = false } = {}) {
+function savedBook({ mode = 'classic', classic, collect, records, muted = false, theme = null } = {}) {
   const book = emptyBook();
   book.mode = mode;
   book.muted = muted;
+  book.theme = theme;
   if (classic) book.games.classic = savedGame('classic', classic);
   if (collect) book.games.collect = savedGame('collect', collect);
   if (records) Object.assign(book.records, records);
@@ -685,4 +686,34 @@ test('suika UI: pagehide flushes latest physics and stops RAF; BFCache pageshow 
   h.clock.frame();
   h.clock.frame();
   assert.notDeepEqual(h.snapshot().fruits, before.fruits, 'Only explicit resume restarts physics');
+});
+
+test('suika UI: theme toggle flips the root attribute, persists and reaches the renderer', t => {
+  const h = bootSuika(t, { book: savedBook() });
+  const root = h.document.documentElement;
+  assert.equal(root.getAttribute('data-theme'), 'light', 'Without a saved choice the system mock stays light');
+  assert.equal(h.node('themeButton').getAttribute('aria-pressed'), 'false');
+  assert.equal(h.node('themeButton').textContent, '☾');
+  assert.deepEqual(h.renderer.themes, ['light']);
+  h.click('themeButton');
+  assert.equal(root.getAttribute('data-theme'), 'dark');
+  assert.equal(h.node('themeButton').getAttribute('aria-pressed'), 'true');
+  assert.equal(h.node('themeButton').getAttribute('aria-label'), '切换亮色主题');
+  assert.equal(h.node('themeMeta').content, '#131e18');
+  assert.equal(h.saved().theme, 'dark');
+  assert.deepEqual(h.renderer.themes, ['light', 'dark']);
+  h.key('t');
+  assert.equal(root.getAttribute('data-theme'), 'light');
+  assert.equal(h.node('themeButton').textContent, '☾');
+  assert.equal(h.saved().theme, 'light');
+});
+
+test('suika UI: a saved theme wins over the system preference and round-trips', t => {
+  const h = bootSuika(t, { book: savedBook({ theme: 'dark' }), darkSystem: false });
+  assert.equal(h.document.documentElement.getAttribute('data-theme'), 'dark');
+  const light = bootSuika(t, { book: savedBook({ theme: 'light' }), darkSystem: true });
+  assert.equal(light.document.documentElement.getAttribute('data-theme'), 'light');
+  const follower = bootSuika(t, { book: savedBook(), darkSystem: true });
+  assert.equal(follower.document.documentElement.getAttribute('data-theme'), 'dark',
+    'Without a saved choice the system preference leads');
 });

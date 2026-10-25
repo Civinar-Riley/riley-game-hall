@@ -23,6 +23,36 @@ const radiusOf = (tier) => FRUITS[tierOf(tier)].radius;
 const capacityFor = (count) => Math.max(16, 2 ** Math.ceil(Math.log2(Math.max(1, count))));
 const validFruit = (fruit) => fruit && Number.isFinite(fruit.x) && Number.isFinite(fruit.y);
 
+// Basket/aim/scene tints per page theme. Fruit colors and effects stay shared:
+// the CSS owns the stage background, these own what is drawn on top of it.
+const SCENE_THEMES = {
+  light: {
+    sky: '#fff7e4', skyGround: '#87966b', key: '#fff4dc', fill: '#e6efdb',
+    glass: '#aecb9c', edge: '#91b27c', glint: '#fffdf0', floor: '#bbd19c', backdrop: '#e0ebcb',
+    aim: '#829b68', landing: '#8fac71',
+    canvas: {
+      veil: 'rgba(206,225,183,0.08)', aimDash: 'rgba(125,153,96,0.52)',
+      landingRing: 'rgba(135,163,104,0.25)',
+      floorTop: '#d5e2b9', floorBottom: '#abc48e',
+      wallSoft: 'rgba(167,195,143,0.36)', wallCore: 'rgba(135,167,111,0.67)',
+      rim: 'rgba(255,253,238,0.85)',
+    },
+  },
+  dark: {
+    sky: '#f3ead0', skyGround: '#2c4234', key: '#ffedc9', fill: '#cfe0bd',
+    glass: '#42604b', edge: '#5d8266', glint: '#e9f2d4', floor: '#4b6a4e', backdrop: '#9fbf8e',
+    aim: '#a9c88f', landing: '#9dbd82',
+    canvas: {
+      veil: 'rgba(198,220,176,0.06)', aimDash: 'rgba(169,200,143,0.6)',
+      landingRing: 'rgba(157,189,130,0.32)',
+      floorTop: '#5a7a54', floorBottom: '#3c5741',
+      wallSoft: 'rgba(122,152,112,0.30)', wallCore: 'rgba(150,180,132,0.62)',
+      rim: 'rgba(233,242,212,0.78)',
+    },
+  },
+};
+const normalizeTheme = (value) => value === 'dark' ? 'dark' : 'light';
+
 function aimLanding(fruits, x, radius) {
   let y = BOTTOM - radius;
   for (const fruit of fruits) {
@@ -203,7 +233,8 @@ function createShadowTexture() {
   return texture;
 }
 
-function makeWebGL(canvas, effects, reducedMotion, callbacks) {
+function makeWebGL(canvas, effects, reducedMotion, callbacks, theme) {
+  const palette = SCENE_THEMES[normalizeTheme(theme)];
   const renderer = new THREE.WebGLRenderer({
     canvas, alpha: true, antialias: true, premultipliedAlpha: true,
     powerPreference: 'high-performance', stencil: false,
@@ -255,11 +286,11 @@ function makeWebGL(canvas, effects, reducedMotion, callbacks) {
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.10;
     renderer.shadowMap.enabled = false;
-    const sky = new THREE.HemisphereLight('#fff7e4', '#87966b', 1.65);
-    const key = new THREE.DirectionalLight('#fff4dc', 3.05);
+    const sky = new THREE.HemisphereLight(palette.sky, palette.skyGround, 1.65);
+    const key = new THREE.DirectionalLight(palette.key, 3.05);
     key.position.set(-180, 900, 600);
     key.target.position.set(WIDTH / 2, HEIGHT / 2, 0);
-    const fill = new THREE.DirectionalLight('#e6efdb', 0.68);
+    const fill = new THREE.DirectionalLight(palette.fill, 0.68);
     fill.position.set(620, 300, 380);
     fill.target.position.set(WIDTH / 2, HEIGHT / 2, 0);
     scene.add(sky, key, key.target, fill, fill.target);
@@ -272,19 +303,19 @@ function makeWebGL(canvas, effects, reducedMotion, callbacks) {
       vertexColors: true, roughness: 0.93, metalness: 0, side: THREE.DoubleSide,
     }));
     const glass = ownMaterial(new THREE.MeshStandardMaterial({
-      color: '#aecb9c', roughness: 0.72, transparent: true, opacity: 0.27, depthWrite: false,
+      color: palette.glass, roughness: 0.72, transparent: true, opacity: 0.27, depthWrite: false,
     }));
     const edge = ownMaterial(new THREE.MeshBasicMaterial({
-      color: '#91b27c', transparent: true, opacity: 0.65, depthWrite: false,
+      color: palette.edge, transparent: true, opacity: 0.65, depthWrite: false,
     }));
     const glint = ownMaterial(new THREE.MeshBasicMaterial({
-      color: '#fffdf0', transparent: true, opacity: 0.74, depthWrite: false,
+      color: palette.glint, transparent: true, opacity: 0.74, depthWrite: false,
     }));
     const floorMaterial = ownMaterial(new THREE.MeshStandardMaterial({
-      color: '#bbd19c', roughness: 0.88, metalness: 0,
+      color: palette.floor, roughness: 0.88, metalness: 0,
     }));
     const backdropMaterial = ownMaterial(new THREE.MeshBasicMaterial({
-      color: '#e0ebcb', transparent: true, opacity: 0.08, depthWrite: false,
+      color: palette.backdrop, transparent: true, opacity: 0.08, depthWrite: false,
     }));
     const addBox = (x, y, z, w, h, d, material, order = 0) => {
       const mesh = new THREE.Mesh(box, material);
@@ -384,7 +415,7 @@ function makeWebGL(canvas, effects, reducedMotion, callbacks) {
     const aimDistances = new THREE.BufferAttribute(new Float32Array(2), 1).setUsage(THREE.DynamicDrawUsage);
     aimGeometry.setAttribute('lineDistance', aimDistances);
     const aimMaterial = ownMaterial(new THREE.LineDashedMaterial({
-      color: '#829b68', dashSize: 4, gapSize: 6, transparent: true, opacity: 0.51,
+      color: palette.aim, dashSize: 4, gapSize: 6, transparent: true, opacity: 0.51,
       depthTest: false, depthWrite: false, toneMapped: false,
     }));
     const aimLine = new THREE.Line(aimGeometry, aimMaterial);
@@ -392,11 +423,26 @@ function makeWebGL(canvas, effects, reducedMotion, callbacks) {
     aimLine.renderOrder = 20;
     scene.add(aimLine);
     const landingMaterial = ownMaterial(new THREE.MeshBasicMaterial({
-      color: '#8fac71', transparent: true, opacity: 0.23, depthTest: false, depthWrite: false, toneMapped: false,
+      color: palette.landing, transparent: true, opacity: 0.23, depthTest: false, depthWrite: false, toneMapped: false,
     }));
     const landing = new THREE.Mesh(ringGeometry, landingMaterial);
     landing.renderOrder = 20;
     scene.add(landing);
+
+    function applySceneTheme(next) {
+      const colors = SCENE_THEMES[normalizeTheme(next)];
+      sky.color.set(colors.sky);
+      sky.groundColor.set(colors.skyGround);
+      key.color.set(colors.key);
+      fill.color.set(colors.fill);
+      glass.color.set(colors.glass);
+      edge.color.set(colors.edge);
+      glint.color.set(colors.glint);
+      floorMaterial.color.set(colors.floor);
+      backdropMaterial.color.set(colors.backdrop);
+      aimMaterial.color.set(colors.aim);
+      landingMaterial.color.set(colors.landing);
+    }
 
     const particlePositions = new Float32Array(MAX_PARTICLES * 3);
     const particleColors = new Float32Array(MAX_PARTICLES * 3);
@@ -584,7 +630,7 @@ function makeWebGL(canvas, effects, reducedMotion, callbacks) {
 
     canvas.addEventListener('webglcontextlost', contextLost, false);
     canvas.addEventListener('webglcontextrestored', contextRestored, false);
-    return { kind: 'webgl', resize, render, dispose: cleanup };
+    return { kind: 'webgl', resize, render, setTheme: applySceneTheme, dispose: cleanup };
   } catch (error) {
     cleanup();
     throw error;
@@ -633,9 +679,10 @@ function canvasSurface(canvas) {
   };
 }
 
-function makeCanvas(canvas, effects, reducedMotion) {
+function makeCanvas(canvas, effects, reducedMotion, theme) {
   const surface = canvasSurface(canvas);
   const context = surface.context;
+  let palette = SCENE_THEMES[normalizeTheme(theme)];
   let width = 0;
   let height = 0;
   let pixelRatio = 0;
@@ -688,7 +735,7 @@ function makeCanvas(canvas, effects, reducedMotion) {
     context.setTransform(pixelRatio * scale, 0, 0, pixelRatio * scale, pixelRatio * offsetX, pixelRatio * offsetY);
     context.imageSmoothingEnabled = true;
     context.imageSmoothingQuality = 'high';
-    context.fillStyle = 'rgba(206,225,183,0.08)';
+    context.fillStyle = palette.canvas.veil;
     context.fillRect(LEFT, 104, RIGHT - LEFT, BOTTOM - 104);
     for (const fruit of frame.fruits) {
       if (!validFruit(fruit)) continue;
@@ -697,7 +744,7 @@ function makeCanvas(canvas, effects, reducedMotion) {
     }
     if (frame.showAim) {
       const start = SPAWN_Y + frame.radius + 6;
-      context.strokeStyle = 'rgba(125,153,96,0.52)';
+      context.strokeStyle = palette.canvas.aimDash;
       context.lineWidth = 1.2;
       context.setLineDash([4, 6]);
       if (frame.landing > start + 4) {
@@ -708,7 +755,7 @@ function makeCanvas(canvas, effects, reducedMotion) {
       }
       context.setLineDash([]);
       if (frame.landing > SPAWN_Y + frame.radius * 1.5) {
-        context.strokeStyle = 'rgba(135,163,104,0.25)';
+        context.strokeStyle = palette.canvas.landingRing;
         context.beginPath();
         context.arc(frame.x, frame.landing, frame.radius, 0, TAU);
         context.stroke();
@@ -720,13 +767,13 @@ function makeCanvas(canvas, effects, reducedMotion) {
     if (frame.showAim) drawFruit(frame.tier, frame.x, SPAWN_Y);
 
     const floor = context.createLinearGradient(0, BOTTOM, 0, BOTTOM + 14);
-    floor.addColorStop(0, '#d5e2b9');
-    floor.addColorStop(1, '#abc48e');
+    floor.addColorStop(0, palette.canvas.floorTop);
+    floor.addColorStop(1, palette.canvas.floorBottom);
     context.fillStyle = floor;
     context.fillRect(8, BOTTOM, WIDTH - 16, 13);
     context.lineCap = 'round';
     context.lineWidth = 7;
-    context.strokeStyle = 'rgba(167,195,143,0.36)';
+    context.strokeStyle = palette.canvas.wallSoft;
     for (const x of [LEFT - 4, RIGHT + 4]) {
       context.beginPath();
       context.moveTo(x, 104);
@@ -734,14 +781,14 @@ function makeCanvas(canvas, effects, reducedMotion) {
       context.stroke();
     }
     context.lineWidth = 1.5;
-    context.strokeStyle = 'rgba(135,167,111,0.67)';
+    context.strokeStyle = palette.canvas.wallCore;
     for (const x of [LEFT - 4, RIGHT + 4]) {
       context.beginPath();
       context.moveTo(x, 104);
       context.lineTo(x, BOTTOM + 6);
       context.stroke();
     }
-    context.strokeStyle = 'rgba(255,253,238,0.85)';
+    context.strokeStyle = palette.canvas.rim;
     context.beginPath();
     context.moveTo(12, BOTTOM + 1.5);
     context.lineTo(WIDTH - 12, BOTTOM + 1.5);
@@ -785,6 +832,7 @@ function makeCanvas(canvas, effects, reducedMotion) {
 
   return {
     kind: 'canvas', resize, render,
+    setTheme(next) { palette = SCENE_THEMES[normalizeTheme(next)]; },
     dispose() {
       context.setTransform(1, 0, 0, 1, 0, 0);
       context.clearRect(0, 0, surface.canvas.width, surface.canvas.height);
@@ -801,6 +849,7 @@ function makeCanvas(canvas, effects, reducedMotion) {
  */
 export function createFruitRenderer(canvas, {
   reducedMotion = false,
+  theme = 'light',
   onContextLost = () => {},
   onContextRestored = () => {},
 } = {}) {
@@ -810,9 +859,9 @@ export function createFruitRenderer(canvas, {
   let requestedWidth = WIDTH;
   let requestedHeight = HEIGHT;
   try {
-    backend = makeWebGL(canvas, effects, reducedMotion, { onContextLost, onContextRestored });
+    backend = makeWebGL(canvas, effects, reducedMotion, { onContextLost, onContextRestored }, theme);
   } catch {
-    backend = makeCanvas(canvas, effects, reducedMotion);
+    backend = makeCanvas(canvas, effects, reducedMotion, theme);
   }
 
   function resize(width = requestedWidth, height = requestedHeight) {
@@ -840,6 +889,10 @@ export function createFruitRenderer(canvas, {
     },
     clearEffects() {
       effects.clear();
+    },
+    setTheme(next) {
+      if (disposed) return;
+      backend.setTheme?.(normalizeTheme(next));
     },
     dispose() {
       if (disposed) return;

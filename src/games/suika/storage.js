@@ -1,5 +1,6 @@
 export const SAVE_KEY = 'suika_orchard_v1';
 export const MODES = ['classic', 'collect'];
+export const THEMES = ['light', 'dark'];
 
 function record(value) {
   const count = n => Number.isSafeInteger(n) && n >= 0 ? Math.min(n, 1e12) : 0;
@@ -8,7 +9,7 @@ function record(value) {
 
 export function emptyBook() {
   return {
-    version: 1, mode: 'classic', muted: false,
+    version: 1, mode: 'classic', muted: false, theme: null,
     records: { classic: record(), collect: record() },
     games: { classic: null, collect: null },
   };
@@ -23,6 +24,7 @@ export function loadBook(storage) {
     if (!saved || saved.version !== 1) return book;
     book.mode = MODES.includes(saved.mode) ? saved.mode : 'classic';
     book.muted = saved.muted === true;
+    book.theme = THEMES.includes(saved.theme) ? saved.theme : null;
     for (const mode of MODES) {
       book.records[mode] = record(saved.records?.[mode]);
       const game = saved.games?.[mode];

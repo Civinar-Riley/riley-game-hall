@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#f7f5e9">
+  <meta name="theme-color" content="#f7f5e9" id="themeMeta">
   <title>合成大西瓜 · 果日小铺</title>
   <style>/* ORCHARD_STYLES */</style>
 </head>
@@ -13,6 +13,7 @@
       <div class="brand"><span class="brand-mark" aria-hidden="true">◒</span><div><p class="eyebrow">A LITTLE FRUIT, A LITTLE JOY</p><h1>果日小铺<span>合成大西瓜</span></h1></div></div>
       <div class="header-actions">
         <button id="soundButton" class="icon-button" aria-label="关闭音效" title="音效 · M" aria-pressed="false">♪</button>
+        <button id="themeButton" class="icon-button" aria-label="切换暗色主题" title="亮暗主题 · T" aria-pressed="false">☾</button>
         <button id="helpButton" class="icon-button" aria-label="玩法说明" title="玩法说明">?</button>
       </div>
     </header>
@@ -85,7 +86,7 @@
   </dialog>
   <dialog id="helpDialog" aria-labelledby="helpTitle">
     <div class="dialog-content help-content"><p class="eyebrow">HOW TO PLAY</p><h2 id="helpTitle">一篮水果，一点小技巧。</h2>
-      <ul><li><b>相同水果相碰</b>，会合成下一级水果。只会投放前 5 级水果，没有时间限制。</li><li><b>经典模式</b>：最大西瓜留在篮内，不再合成。<b>西瓜收集</b>：合成西瓜后消失，累计收集数量。</li><li>已落入的水果<b>持续超线 3 秒</b>就结束；回落会取消倒计时。两种模式都可能堆满。</li><li>每局<b>移除 2 次、摇一摇 1 次</b>。移除不得分，摇动不保证合成，也不会补充次数。</li><li>手机<b>按住拖动、松手投放</b>；电脑移动鼠标后点击。键盘左右瞄准、空格投放，P 暂停，M 静音。</li><li>切换模式、离开页面会保留进度。回来点击<b>继续游戏</b>才会继续运动。重开只重置当前模式。</li></ul>
+      <ul><li><b>相同水果相碰</b>，会合成下一级水果。只会投放前 5 级水果，没有时间限制。</li><li><b>经典模式</b>：最大西瓜留在篮内，不再合成。<b>西瓜收集</b>：合成西瓜后消失，累计收集数量。</li><li>已落入的水果<b>持续超线 3 秒</b>就结束；回落会取消倒计时。两种模式都可能堆满。</li><li>每局<b>移除 2 次、摇一摇 1 次</b>。移除不得分，摇动不保证合成，也不会补充次数。</li><li>手机<b>按住拖动、松手投放</b>；电脑移动鼠标后点击。键盘左右瞄准、空格投放，P 暂停，M 静音，T 切换<b>亮暗主题</b>，偏好会记住。</li><li>切换模式、离开页面会保留进度。回来点击<b>继续游戏</b>才会继续运动。重开只重置当前模式。</li></ul>
       <button id="closeHelp" class="primary-button">知道啦，去合西瓜</button>
     </div>
   </dialog>

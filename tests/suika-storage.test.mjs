@@ -26,6 +26,22 @@ test('suika saves modes and preferences independently', () => {
   assert.equal(loadBook(storage).records.collect.watermelons, 2);
 });
 
+test('suika theme preference round-trips and unknown values reset to system-follow', () => {
+  const storage = memory();
+  const book = emptyBook();
+  assert.equal(book.theme, null);
+  book.theme = 'dark';
+  saveBook(storage, book);
+  assert.equal(loadBook(storage).theme, 'dark');
+  book.theme = 'light';
+  saveBook(storage, book);
+  assert.equal(loadBook(storage).theme, 'light');
+  book.theme = 'sepia';
+  saveBook(storage, book);
+  assert.equal(loadBook(storage).theme, null);
+  assert.equal(emptyBook().theme, null);
+});
+
 test('suika invalid and unavailable storage cannot prevent a fresh game', () => {
   for (const text of ['{', 'null', '[]', '{"version":2}', 'a'.repeat(250001)]) {
     assert.deepEqual(loadBook({ getItem: () => text }), emptyBook());

@@ -24,5 +24,8 @@ test('suika ships third-party attribution and both gameplay modes', () => {
   assert.match(html, /id="collectMode"/);
   assert.match(html, /id="fruitCanvas"/);
   assert.match(html, /id="confirmDialog"/);
+  assert.match(html, /id="themeButton"/);
+  assert.match(html, /id="themeMeta"/);
+  assert.match(html, /data-theme/);
   assert.match(html, /prefers-reduced-motion/);
 });
