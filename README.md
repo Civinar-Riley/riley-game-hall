@@ -14,8 +14,6 @@
 
 </div>
 
-> 📌 21 点单游戏旧版（Vite 多文件）在 [`main-backup-21point` 分支](https://github.com/Civinar-Riley/riley-game-hall/tree/main-backup-21point)，游戏厅里的 21 点是单文件版。
-
 ## 🕹️ 收录游戏
 
 | 游戏 | 玩法 |
