@@ -63,6 +63,7 @@
 ```bash
 npm install
 npm run dev      # 开发预览
+npm test         # 存档桥及游戏逻辑回归测试（Node 内置测试器）
 npm run build    # 构建，产物在 dist/
 ```
 

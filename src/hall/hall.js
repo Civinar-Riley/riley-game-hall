@@ -37,7 +37,8 @@ function esc(s) {
 }
 
 let curGame = null;
-const knownFrames = new Set();
+let loadVersion = 0;
+const knownFrames = new Map();
 
 /* ---------------- 存档桥 ---------------- */
 function readSave(file) {
@@ -50,6 +51,8 @@ function writeSave(file, data) {
 }
 let flushT = null, pending = null;
 function flushSaves() {
+    clearTimeout(flushT);
+    flushT = null;
     if (!pending) return;
     Object.keys(pending).forEach(f => writeSave(f, pending[f]));
     pending = null;
@@ -57,9 +60,10 @@ function flushSaves() {
 window.addEventListener('pagehide', flushSaves);
 
 window.addEventListener('message', e => {
-    if (!knownFrames.has(e.source)) return;
+    const active = knownFrames.get(e.source);
+    if (!active) return;
     const v = validateSavePayload(e.data);
-    if (!v) return;
+    if (!v || v.file !== active.file || v.session !== active.session) return;
     pending = pending || {};
     pending[v.file] = v.data;
     clearTimeout(flushT);
@@ -69,8 +73,8 @@ window.addEventListener('message', e => {
 /* 垫片必须先于游戏脚本执行：有 <head> 插其后，否则放最前。
  * 同时注入统一设计语言（game-theme.css）：:root 变量 + 本游戏 accent；
  * 给 body 加 hall-theme 类，让主题基础样式生效。 */
-function withShim(html, file) {
-    const shim = shimSource(file, JSON.stringify(readSave(file)));
+function withShim(html, file, session) {
+    const shim = shimSource(file, JSON.stringify(readSave(file)), session);
     const accent = ACCENTS[file] || '#f5c542';
     /* accent 必须写在 themeCss 之后：两者同为 :root 选择器，后者才能覆盖
      * game-theme.css 里的默认 --t-accent（否则所有游戏都被默认金色吞掉） */
@@ -93,6 +97,7 @@ function renderWall() {
 }
 
 function backToWall() {
+    ++loadVersion;
     flushSaves();
     curGame = null;
     const frame = $('#gameFrame');
@@ -105,6 +110,7 @@ function backToWall() {
 async function playGame(i) {
     const g = GAMES[i];
     if (!g) return;
+    const version = ++loadVersion;
     flushSaves();
     curGame = i;
     $$('.game-card').forEach((c, k) => c.classList.toggle('active', k === i));
@@ -120,10 +126,16 @@ async function playGame(i) {
         const resp = await fetch(`games/${g.file}?b=${__HALL_BUILD__}`);
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const html = await resp.text();
-        knownFrames.add(frame.contentWindow);
-        frame.srcdoc = withShim(html, g.file);
+        if (version !== loadVersion) return;
+        flushSaves();
+        const session = String(version);
+        const srcdoc = withShim(html, g.file, session);
+        // iframe 导航复用 WindowProxy，必须按会话区分旧页面的卸载快照。
+        knownFrames.set(frame.contentWindow, { file: g.file, session });
+        frame.srcdoc = srcdoc;
         $('#playerTip').textContent = '游戏在独立沙箱中运行，存档自动保存（刷新不丢）';
     } catch (err) {
+        if (version !== loadVersion) return;
         $('#playerTip').textContent = `⚠️ 游戏加载失败：${esc(err.message)}`;
     }
 }
@@ -161,6 +173,8 @@ function init() {
         if (curGame == null) return;
         const g = GAMES[curGame];
         if (!confirm(`确定清空「${g.name}」的存档吗？`)) return;
+        knownFrames.delete($('#gameFrame').contentWindow);
+        if (pending) delete pending[g.file];
         try { localStorage.removeItem(saveKey(g.file)); } catch (e) {}
         playGame(curGame);
     });

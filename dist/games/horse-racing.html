@@ -1903,7 +1903,10 @@
                                 setTimeout(() => this.laneEls[i].finishEl.classList.remove('flash'), 1000);
                             }
                         });
-                        const order = this.horses.map((h, i) => i).sort((a, b) => this.horses[b].progress - this.horses[a].progress);
+                        const running = this.horses.map((h, i) => i)
+                            .filter(i => !this.raceData[i].finished)
+                            .sort((a, b) => this.horses[b].progress - this.horses[a].progress);
+                        const order = this.finishOrder.concat(running);
                         order.forEach((lane, idx) => {
                             const rankEl = this.laneEls[lane].rankEl;
                             rankEl.textContent = idx + 1;

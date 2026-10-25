@@ -260,6 +260,8 @@ h1 .en {
       this._board.cur = this._board.nextShape();
       this._board.started = true;
       this._board.gameover = false;
+      this._board.paused = false;
+      this._board.holding = {left: null, right: null, drop: null};
       this._board.dropDelay = 5;
       this._board.render(true);
       this._board.animate();
@@ -272,6 +274,7 @@ h1 .en {
 
     pause: function() {
       this._board.paused = true;
+      this._board.holding = {left: null, right: null, drop: null};
     },
 
     resume: function() {
@@ -1036,7 +1039,7 @@ h1 .en {
                 var blockIndex = 0;
                 for (var i=0; i<cur.blocksLen; i+=2) {
                   game._filled.add(x + blocks[i], y + blocks[i+1], cur.blockType, cur.blockVariation, blockIndex, cur.orientation);
-                  if (y + blocks[i] < 0) {
+                  if (y + blocks[i+1] < 0) {
                     gameOver = true;
                   }
                   blockIndex++;
@@ -1657,7 +1660,7 @@ h1 .en {
 
       // Handlers: These are used to be able to bind/unbind controls
       var handleKeyDown = function(evt) {
-        if( ! game._board.cur ) { return true; }
+        if( ! game._board.cur || ! game._board.started || game._board.paused || game._board.gameover ) { return true; }
         var caught = false;
 
         caught = true;
@@ -1750,6 +1753,7 @@ h1 .en {
       // Movements can be held for faster movement
       var moveLeft = function(event){
         event.preventDefault();
+        if( ! game._board.cur || ! game._board.started || game._board.paused || game._board.gameover ) { return; }
         game._board.cur.moveLeft();
         game._board.holding.left = Date.now();
         game._board.holding.right = null;
@@ -1757,6 +1761,7 @@ h1 .en {
       };
       var moveRight = function(event){
         event.preventDefault();
+        if( ! game._board.cur || ! game._board.started || game._board.paused || game._board.gameover ) { return; }
         game._board.cur.moveRight();
         game._board.holding.right = Date.now();
         game._board.holding.left = null;
@@ -1764,6 +1769,7 @@ h1 .en {
       };
       var drop = function(event){
         event.preventDefault();
+        if( ! game._board.cur || ! game._board.started || game._board.paused || game._board.gameover ) { return; }
         game._board.cur.drop();
         game._board.holding.drop = Date.now();
       };
@@ -1783,10 +1789,12 @@ h1 .en {
       // Rotations can't be held
       var rotateLeft = function(event){
         event.preventDefault();
+        if( ! game._board.cur || ! game._board.started || game._board.paused || game._board.gameover ) { return; }
         game._board.cur.rotate('left');
       };
       var rotateRight = function(event){
         event.preventDefault();
+        if( ! game._board.cur || ! game._board.started || game._board.paused || game._board.gameover ) { return; }
         game._board.cur.rotate('right');
       };
 

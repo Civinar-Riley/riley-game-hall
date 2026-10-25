@@ -1932,7 +1932,7 @@
                     const hand = this.playerHands[this.currentHandIndex];
                     if (!hand || hand.isDone) return false;
                     if (!hand.canSplit) return false;
-                    if (this.splitCount >= this.maxSplitHands) return false;
+                    if (this.playerHands.length >= this.maxSplitHands) return false;
                     // 筹码要够分牌（下注同额）
                     return this.chips >= hand.bet;
                 }
@@ -2238,7 +2238,7 @@
                     const hand = this.playerHands[this.currentHandIndex];
                     if (!hand || hand.isDone || !hand.canSplit) return;
                     if (this.chips < hand.bet) return;
-                    if (this.splitCount >= this.maxSplitHands) return;
+                    if (this.playerHands.length >= this.maxSplitHands) return;
 
                     // 记录分牌使用次数
                     this.stats.data.splitUseCount = (this.stats.data.splitUseCount || 0) + 1;
@@ -2782,6 +2782,7 @@
                         // 退还主注（已在startRound中扣除）
                         this.chips += this.currentBet;
                         this._updateChipDisplay();
+                        this._saveChips();
                     }
 
                     // 如果游戏结束或空闲，直接进入下注状态

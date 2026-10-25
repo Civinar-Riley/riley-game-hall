@@ -531,8 +531,7 @@ function showdown(reason){
   for(const p of al)if(cmpHands(p.hand,win.hand)>0)win=p;
   endRound(win,reason+'，'+win.name+'以'+typeStr(win.hand)+'获胜');
 }
-/* 边池派彩：底池按各人投入额分层，每层归「投入达到该层且未弃牌」的最大牌；
- * 这样筹码不足全下的玩家只能赢走自己投入的等额部分，不会以小博大拿走整池。
+/* 只有全下玩家受投入额上限约束；明/闷牌费率与比牌费不能限制仍有筹码玩家的获奖资格。
  * 无人符合的层（对应玩家都已弃牌）归最终赢家。返回 idx -> 金额，并已入账。 */
 function payout(fallback){
   const levels=[...new Set(S.players.map(p=>p.invested))].filter(v=>v>0).sort((a,b)=>a-b);
@@ -543,7 +542,7 @@ function payout(fallback){
     let amount=0;
     for(const p of S.players)amount+=Math.min(p.invested,lv)-Math.min(p.invested,prev);
     let w=fallback;
-    const eligible=inHand.filter(p=>p.invested>=lv);
+    const eligible=inHand.filter(p=>!p.allIn||p.invested>=lv);
     if(eligible.length){
       w=eligible[0];
       for(const p of eligible)if(cmpHands(p.hand,w.hand)>0)w=p;

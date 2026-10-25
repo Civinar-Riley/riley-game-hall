@@ -1358,6 +1358,8 @@ function handleTileClick(tile, isRightClick) {
         return;
     }
 
+    if (tile.classList.contains("tile-flagged")) return;
+
     if (!gameState.gameStarted) {
         gameState.gameStarted = true;
         const [r, c] = tile.id.split("-").map(Number);
@@ -1366,8 +1368,7 @@ function handleTileClick(tile, isRightClick) {
     }
 
     const [cr, cc] = tile.id.split("-").map(Number);
-    // 已插旗的格子不判负：长按插旗后浏览器可能补发 click，否则玩家无操作失误也会踩雷
-    if (!tile.classList.contains("tile-flagged") && gameState.mineGrid[cr][cc]) {
+    if (gameState.mineGrid[cr][cc]) {
         gameOver(false);
         return;
     }

@@ -1010,6 +1010,7 @@ function pause(o) {
         return;
     }
 
+	resetSpeedUp();
 	pausable = false;
 	writeHighScores();
 	var message;
@@ -2040,7 +2041,20 @@ function drawKey(key, x, y) {
 
 
 /* ===== upstream: input.js ===== */
-;function addKeyListeners() {
+;var speedUpKeys = {down: false, s: false};
+function resetSpeedUp() {
+	speedUpKeys = {down: false, s: false};
+	settings.speedUpKeyHeld = false;
+	window.rush = 1;
+}
+
+function setSpeedUpKey(key, held) {
+	speedUpKeys[key] = held && !!MainHex && gameState === 1;
+	settings.speedUpKeyHeld = speedUpKeys.down || speedUpKeys.s;
+	window.rush = settings.speedUpKeyHeld ? 4 : 1;
+}
+
+function addKeyListeners() {
 	keypress.register_combo({
 		keys: "left",
 		on_keydown: function() {
@@ -2061,24 +2075,11 @@ function drawKey(key, x, y) {
 		keypress.register_combo({
 		keys: "down",
 		on_keydown: function() {
-			var tempSpeed = settings.speedModifier;
-			if (MainHex && gameState !== 0){
-				//speed up block temporarily
-				if(settings.speedUpKeyHeld == false){
-					settings.speedUpKeyHeld = true;
-					window.rush *=4;
-				}
-			}
-			//settings.speedModifier = tempSpeed;
+			setSpeedUpKey('down', true);
 		},
 		on_keyup:function(){
-			if (MainHex && gameState !== 0){
-				//speed up block temporarily
-				
-				window.rush /=4;
-				settings.speedUpKeyHeld = false;
-			}
-		}	
+			setSpeedUpKey('down', false);
+		}
 	});
 	
 	keypress.register_combo({
@@ -2102,24 +2103,11 @@ function drawKey(key, x, y) {
 	keypress.register_combo({
 		keys: "s",
 		on_keydown: function() {
-			var tempSpeed = settings.speedModifier;
-			if (MainHex && gameState !== 0){
-				//speed up block temporarily
-				if(settings.speedUpKeyHeld == false){
-					settings.speedUpKeyHeld = true;
-					window.rush *=4;
-				}
-			}
-			//settings.speedModifier = tempSpeed;
+			setSpeedUpKey('s', true);
 		},
 		on_keyup:function(){
-			if (MainHex && gameState !== 0){
-				//speed up block temporarily
-				
-				window.rush /=4;
-				settings.speedUpKeyHeld = false;
-			}
-		}	
+			setSpeedUpKey('s', false);
+		}
 	});
 	keypress.register_combo({
 		keys: "p",
@@ -2339,6 +2327,7 @@ function toggleDevTools() {
 }
 
 function resumeGame() {
+	resetSpeedUp();
 	gameState = 1;
 	hideUIElements();
 	$('#pauseBtn').show();
@@ -2370,6 +2359,7 @@ function hideUIElements() {
 
 function init(b) {
 	if(settings.ending_block && b == 1){return;}
+	resetSpeedUp();
 	if (b) {
 		$("#pauseBtn").attr('src',"data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiIHN0YW5kYWxvbmU9Im5vIj8+Cjxzdmcgd2lkdGg9Ijc1cHgiIGhlaWdodD0iNjVweCIgdmlld0JveD0iMCAwIDc1IDY1IiB2ZXJzaW9uPSIxLjEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHhtbG5zOnNrZXRjaD0iaHR0cDovL3d3dy5ib2hlbWlhbmNvZGluZy5jb20vc2tldGNoL25zIj4KCTwhLS0gR2VuZXJhdG9yOiBTa2V0Y2ggMy4yLjIgKDk5ODMpIC0gaHR0cDovL3d3dy5ib2hlbWlhbmNvZGluZy5jb20vc2tldGNoIC0tPgoJPHRpdGxlPlBhdXNlIGJ1dHRvbjwvdGl0bGU+Cgk8ZGVzYz5DcmVhdGVkIHdpdGggU2tldGNoLjwvZGVzYz4KCTxkZWZzPjwvZGVmcz4KCTxnIGlkPSJQYWdlLTEiIHN0cm9rZT0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIxIiBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiIHNrZXRjaDp0eXBlPSJNU1BhZ2UiPgoJCTxnIGlkPSJOZXctZ2FtZSIgc2tldGNoOnR5cGU9Ik1TQXJ0Ym9hcmRHcm91cCIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTI3NS4wMDAwMDAsIC01NjUuMDAwMDAwKSI+CgkJCTxnIGlkPSJQYXVzZS1idXR0b24iIHNrZXRjaDp0eXBlPSJNU0xheWVyR3JvdXAiIHRyYW5zZm9ybT0idHJhbnNsYXRlKDI3NS4wMDAwMDAsIDU2MC4wMDAwMDApIj4KCQkJCTxwb2x5Z29uIGlkPSJQYXVzZS1oZXgiIGZpbGw9IiNGRkZGRkYiIHNrZXRjaDp0eXBlPSJNU1NoYXBlR3JvdXAiIHRyYW5zZm9ybT0idHJhbnNsYXRlKDM3LjUwMDAwMCwgMzcuNTAwMDAwKSByb3RhdGUoLTkwLjAwMDAwMCkgdHJhbnNsYXRlKC0zNy41MDAwMDAsIC0zNy41MDAwMDApICIgcG9pbnRzPSIzNy41IDAgNjkuOTc1OTUyNiAxOC43NSA2OS45NzU5NTI2IDU2LjI1IDM3LjUgNzUgNS4wMjQwNDczNiA1Ni4yNSA1LjAyNDA0NzM2IDE4Ljc1ICI+PC9wb2x5Z29uPgoJCQkJPHBhdGggZD0iTTI2LDUyIEwzNCw1MiBMMzQsMjQgTDI2LDI0IEwyNiw1MiBMMjYsNTIgWiBNNDIsMjQgTDQyLDUyIEw1MCw1MiBMNTAsMjQgTDQyLDI0IEw0MiwyNCBaIiBpZD0iUGF1c2Utc2hhcGUiIGZpbGw9IiMyQzNFNTAiIHNrZXRjaDp0eXBlPSJNU1NoYXBlR3JvdXAiPjwvcGF0aD4KCQkJPC9nPgoJCTwvZz4KCTwvZz4KPC9zdmc+");
 		if ($('#helpScreen').is(":visible")) {
@@ -2536,6 +2526,7 @@ function animLoop() {
 			var saveState = localStorage.getItem("saveState") || "{}";
 			try { saveState = JSONfn.parse(saveState); } catch (e) { saveState = {}; }
 			gameState = 2;
+			resetSpeedUp();
 
 			setTimeout(function() {
 				enableRestart();
@@ -3091,6 +3082,9 @@ var SFX={
 };
 (function(){
   var btn=document.getElementById('sfxbtn');
+  function stopInput(e){e.stopPropagation();}
+  btn.addEventListener('mousedown',stopInput);
+  btn.addEventListener('touchstart',stopInput);
   function sync(){btn.textContent=SFX.enabled?'🔊':'🔇';}
   btn.onclick=function(){SFX.toggle();sync();};
   sync();
