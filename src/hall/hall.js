@@ -16,6 +16,7 @@ const ACCENTS = {
     'match-pairs.html': '#2fd6a3',  // 薄荷绿（保留原风格）
     'hextris.html': '#5aa9ff',      // 雾蓝（原 #2c3e50 系）
     'blockrain.html': '#39c5cf',    // 青（方块主色之一）
+    'suika.html': '#648b45',        // 果绿
 };
 
 /* 游戏清单：加游戏 = public/games/ 里丢一个单文件 html + 在这里加一行 */
@@ -27,6 +28,7 @@ const GAMES = [
     { file: 'zhajinhua.html',    icon: '🃏', name: '炸金花',         desc: '经典炸金花：3 张牌比大小，3 个 AI 陪你唬人' },
     { file: 'hextris.html',      icon: '⬡', name: '六边形消消乐',   desc: 'Hextris 开源移植：旋转六边形接住落块，三连同色消除' },
     { file: 'blockrain.html',    icon: '🧱', name: '俄罗斯方块',     desc: 'Blockrain 开源移植：经典七种方块消行得分，普通/友好/刁钻三种 AI 难度' },
+    { file: 'suika.html',        icon: '🍉', name: '合成大西瓜',     desc: '果日小铺：立体水果碰一碰，经典冲分 / 西瓜收集双模式，随时接着玩' },
 ];
 
 const $ = (s, root) => (root || document).querySelector(s);

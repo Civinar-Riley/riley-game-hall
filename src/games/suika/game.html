@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f5e9">
+  <title>合成大西瓜 · 果日小铺</title>
+  <style>/* ORCHARD_STYLES */</style>
+</head>
+<body>
+  <main class="orchard">
+    <header class="shop-header">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">◒</span><div><p class="eyebrow">A LITTLE FRUIT, A LITTLE JOY</p><h1>果日小铺<span>合成大西瓜</span></h1></div></div>
+      <div class="header-actions">
+        <button id="soundButton" class="icon-button" aria-label="关闭音效" title="音效 · M" aria-pressed="false">♪</button>
+        <button id="helpButton" class="icon-button" aria-label="玩法说明" title="玩法说明">?</button>
+      </div>
+    </header>
+
+    <div class="game-layout">
+      <aside class="left-column">
+        <nav class="mode-switch" aria-label="游戏模式">
+          <button id="classicMode" class="mode-button active" aria-pressed="true"><span class="mode-symbol">◔</span><span>经典模式<small>慢慢合，冲高分</small></span></button>
+          <button id="collectMode" class="mode-button" aria-pressed="false"><span class="mode-symbol">▤</span><span>西瓜收集<small>合出西瓜，腾出空间</small></span></button>
+        </nav>
+        <section class="daily-note" aria-label="游戏提示">
+          <span class="note-kicker">今日份的小确幸</span>
+          <h2>把小小的快乐，<br>合成大西瓜。</h2>
+          <p id="modeDescription">相同水果相碰就会长大。<br>西瓜留在篮子里，看看能得多少分。</p>
+          <div class="watermelon-stamp" aria-hidden="true"><i></i><b>FRESH & HAPPY</b></div>
+          <p class="quiet-tip">不用赶时间，<br>给每一颗水果找个好位置。</p>
+        </section>
+      </aside>
+
+      <section class="play-column" aria-label="合成大西瓜游戏">
+        <div class="scoreboard">
+          <div class="score-item"><span>本局得分</span><strong id="score">0</strong></div>
+          <div class="score-item best-item"><span>最佳纪录</span><strong id="bestScore">0</strong></div>
+          <div class="next-fruit"><span>下一颗</span><img id="nextFruit" alt=""><span id="nextName" class="sr-only"></span></div>
+        </div>
+        <div class="board-wrap" id="boardWrap">
+          <canvas id="fruitCanvas" width="440" height="620" tabindex="0" role="application" aria-label="水果篮。鼠标移动瞄准，点击投放；触屏拖动后松手投放；也可用左右方向键瞄准，空格投放。"></canvas>
+          <div class="danger-line" id="dangerLine"><span id="dangerText">别超过这条线哦</span></div>
+          <div class="basket-label" aria-hidden="true">FRESH FRUIT MARKET</div>
+          <div id="removeHint" class="remove-hint" hidden>点一颗水果移除 · 再点道具取消</div>
+          <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+          <div class="board-overlay" id="gameOverlay">
+            <div class="overlay-card">
+              <div class="overlay-fruit"><img id="heroFruit" alt="圆润的西瓜"></div>
+              <p class="eyebrow" id="overlayEyebrow">TODAY IS A FRUITFUL DAY</p>
+              <h2 id="overlayTitle">开一局，甜一下。</h2>
+              <p id="overlayDescription">小水果碰一碰，快乐就会大一点。</p>
+              <button id="startButton" class="primary-button">开始合成 <span aria-hidden="true">↗</span></button>
+              <span class="overlay-foot" id="overlayFoot">没有时间限制 · 每一步都算数</span>
+            </div>
+          </div>
+        </div>
+        <div class="game-controls">
+          <button id="removeButton" class="tool-button" aria-pressed="false" title="选择一颗水果移除，不得分"><span class="tool-symbol" aria-hidden="true">✕</span>移除<span class="tool-count" id="removeCount">2</span></button>
+          <button id="shakeButton" class="tool-button" title="轻轻摇动水果篮，不保证合成"><span class="tool-symbol" aria-hidden="true">↔</span>摇一摇<span class="tool-count" id="shakeCount">1</span></button>
+          <button id="pauseButton" class="small-control" aria-label="暂停游戏" title="暂停 · P">Ⅱ</button>
+          <button id="restartButton" class="small-control" aria-label="重新开始" title="重新开始">↻</button>
+        </div>
+        <p class="input-hint" id="inputHint">移动瞄准 · 点击投放<span>← → / 空格也可以</span></p>
+      </section>
+
+      <aside class="right-column">
+        <section class="harvest-card" aria-label="西瓜收获">
+          <span class="note-kicker" id="harvestLabel">本局的小成就</span>
+          <div class="harvest-total"><img id="harvestFruit" alt="西瓜"><strong>× <span id="watermelons">0</span></strong></div>
+          <p id="harvestDescription">向第一颗西瓜出发</p>
+          <span id="bestHarvest">单局最多 0 颗</span>
+        </section>
+        <section class="fruit-guide" aria-label="水果合成图鉴">
+          <div class="guide-heading"><h2>成长图鉴</h2><span>小小一颗，大大快乐</span></div>
+          <ol id="fruitChain"></ol>
+        </section>
+        <p class="save-status" id="saveStatus" role="status">● 进度自动保存</p>
+      </aside>
+    </div>
+  </main>
+
+  <dialog id="confirmDialog" aria-labelledby="confirmTitle">
+    <div class="dialog-content"><p class="eyebrow">A FRESH START</p><h2 id="confirmTitle">重新装满快乐？</h2><p>当前模式的这一局会重新开始，<br>历史纪录和另一模式的进度会保留。</p><div class="dialog-actions"><button id="cancelRestart" class="secondary-button">继续这一局</button><button id="confirmRestart" class="primary-button">重新开始</button></div></div>
+  </dialog>
+  <dialog id="helpDialog" aria-labelledby="helpTitle">
+    <div class="dialog-content help-content"><p class="eyebrow">HOW TO PLAY</p><h2 id="helpTitle">一篮水果，一点小技巧。</h2>
+      <ul><li><b>相同水果相碰</b>，会合成下一级水果。只会投放前 5 级水果，没有时间限制。</li><li><b>经典模式</b>：最大西瓜留在篮内，不再合成。<b>西瓜收集</b>：合成西瓜后消失，累计收集数量。</li><li>已落入的水果<b>持续超线 3 秒</b>就结束；回落会取消倒计时。两种模式都可能堆满。</li><li>每局<b>移除 2 次、摇一摇 1 次</b>。移除不得分，摇动不保证合成，也不会补充次数。</li><li>手机<b>按住拖动、松手投放</b>；电脑移动鼠标后点击。键盘左右瞄准、空格投放，P 暂停，M 静音。</li><li>切换模式、离开页面会保留进度。回来点击<b>继续游戏</b>才会继续运动。重开只重置当前模式。</li></ul>
+      <button id="closeHelp" class="primary-button">知道啦，去合西瓜</button>
+    </div>
+  </dialog>
+  <script>/* ORCHARD_SCRIPT */</script>
+</body>
+</html>
