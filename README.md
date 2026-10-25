@@ -33,9 +33,13 @@
 |------|------|------|
 | ![大厅](screenshots/hall.png) | ![21点](screenshots/blackjack.png) | ![炸金花](screenshots/zhajinhua.png) |
 
-| 六边形消消乐 | 扫雷 | 赛马场 | 连连看 |
-|------|------|------|------|
-| ![六边形消消乐](screenshots/hextris.png) | ![扫雷](screenshots/minesweeper.png) | ![赛马场](screenshots/horse.png) | ![连连看](screenshots/matchpairs.png) |
+| 六边形消消乐 | 扫雷 | 赛马场 |
+|------|------|------|
+| ![六边形消消乐](screenshots/hextris.png) | ![扫雷](screenshots/minesweeper.png) | ![赛马场](screenshots/horse.png) |
+
+| 连连看 | 俄罗斯方块 | 合成大西瓜 |
+|------|------|------|
+| ![连连看](screenshots/matchpairs.png) | ![俄罗斯方块](screenshots/blockrain.png) | ![合成大西瓜](screenshots/suika.png) |
 
 ## ✨ 特性
 
